@@ -1,0 +1,2530 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport"
+      content="width=device-width, initial-scale=1.0,
+               maximum-scale=1.0, user-scalable=no,
+               viewport-fit=cover">
+
+<title>Alerte Contrôleur 👮 · Grenoble</title>
+
+<!-- Leaflet -->
+<link
+  rel="stylesheet"
+  href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+/>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<style>
+:root{
+  --black:#0d1017;
+  --panel:#161b26;
+  --panel2:#1c2333;
+  --amber:#e8a33d;
+  --amberDim:#7a6636;
+  --red:#e05a4e;
+  --green:#45b58a;
+  --grey:#98a1b3;
+  --greyDim:#5c6478;
+  --line:rgba(255,255,255,.08);
+}
+
+*{
+  box-sizing:border-box;
+  -webkit-tap-highlight-color:transparent;
+}
+
+html{
+  background:var(--black);
+}
+
+body{
+  margin:0;
+  background:var(--black);
+  color:#fff;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  min-height:100vh;
+  overflow-x:hidden;
+}
+
+/* HEADER */
+
+.header{
+  position:sticky;
+  top:0;
+  z-index:1000;
+  padding:
+    calc(12px + env(safe-area-inset-top))
+    14px
+    12px;
+
+  background:rgba(22,27,38,.96);
+  backdrop-filter:blur(14px);
+  border-bottom:1px solid var(--line);
+}
+
+.brandRow{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+}
+
+.brand{
+  display:flex;
+  align-items:center;
+  gap:9px;
+}
+
+.brandIcon{
+  font-size:25px;
+}
+
+.brandTitle{
+  font-family:monospace;
+  font-weight:800;
+  letter-spacing:1px;
+  color:var(--amber);
+  font-size:16px;
+}
+
+.brandSub{
+  margin-top:2px;
+  font-size:10px;
+  color:var(--grey);
+}
+
+.profile{
+  width:36px;
+  height:36px;
+  border-radius:50%;
+  border:1px solid var(--amberDim);
+  background:var(--panel2);
+  color:var(--amber);
+  font-weight:700;
+}
+
+/* TABS */
+
+.tabs{
+  display:flex;
+  gap:6px;
+  margin-top:13px;
+}
+
+.tab{
+  flex:1;
+  border:1px solid var(--line);
+  background:var(--black);
+  color:var(--grey);
+  padding:9px 5px;
+  border-radius:8px;
+  font-weight:600;
+}
+
+.tab.active{
+  background:var(--amber);
+  color:#171006;
+  border-color:var(--amber);
+}
+
+.stats{
+  display:flex;
+  gap:20px;
+  margin-top:10px;
+  font-family:monospace;
+  font-size:11px;
+  color:var(--grey);
+}
+
+.stats b{
+  color:var(--amber);
+  font-size:13px;
+}
+
+/* VIEWS */
+
+.view{
+  display:none;
+}
+
+.view.active{
+  display:block;
+}
+
+/* MAP */
+
+.mapContainer{
+  position:relative;
+  width:100%;
+  height:calc(100vh - 146px);
+  min-height:500px;
+}
+
+#map{
+  width:100%;
+  height:100%;
+  background:#10141f;
+}
+
+.leaflet-container{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+}
+
+.mapTop{
+  position:absolute;
+  z-index:500;
+  top:10px;
+  left:50%;
+  transform:translateX(-50%);
+  background:rgba(22,27,38,.94);
+  border:1px solid var(--line);
+  border-radius:20px;
+  padding:7px 12px;
+  color:var(--grey);
+  font-size:11px;
+  white-space:nowrap;
+  box-shadow:0 4px 15px rgba(0,0,0,.4);
+  pointer-events:none;
+}
+
+/* CUSTOM MARKER */
+
+.controlMarker{
+  width:38px;
+  height:38px;
+  border-radius:50% 50% 50% 0;
+  transform:rotate(-45deg);
+  background:var(--amber);
+  border:3px solid #fff;
+  box-shadow:
+    0 0 0 4px rgba(232,163,61,.25),
+    0 4px 12px rgba(0,0,0,.5);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+
+.controlMarker span{
+  transform:rotate(45deg);
+  font-size:18px;
+}
+
+.controlMarker.aging{
+  background:var(--amberDim);
+}
+
+.controlMarker.stale{
+  background:#596174;
+}
+
+.myMarker{
+  width:34px;
+  height:34px;
+  border-radius:50%;
+  background:#e8a33d;
+  border:3px solid white;
+  box-shadow:0 3px 12px rgba(0,0,0,.5);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:16px;
+}
+
+/* POPUP */
+
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip{
+  background:var(--panel);
+  color:white;
+}
+
+.leaflet-popup-content{
+  margin:13px;
+  min-width:190px;
+}
+
+.popupTitle{
+  color:var(--amber);
+  font-family:monospace;
+  font-weight:800;
+  font-size:15px;
+}
+
+.popupLoc{
+  margin-top:4px;
+  font-weight:600;
+}
+
+.popupMeta{
+  color:var(--grey);
+  font-size:11px;
+  margin-top:5px;
+}
+
+.popupNote{
+  color:var(--grey);
+  font-size:11px;
+  margin-top:6px;
+  font-style:italic;
+}
+
+.popupButtons{
+  display:flex;
+  gap:6px;
+  margin-top:10px;
+}
+
+.popupButtons button{
+  flex:1;
+  padding:8px 5px;
+  border-radius:7px;
+  border:1px solid var(--line);
+  background:var(--panel2);
+  color:var(--amber);
+}
+
+/* FAB */
+
+.fab{
+  position:fixed;
+  right:18px;
+  bottom:
+    calc(20px + env(safe-area-inset-bottom));
+  z-index:1100;
+
+  width:60px;
+  height:60px;
+  border:none;
+  border-radius:50%;
+
+  background:linear-gradient(145deg,#eb6a5d,var(--red));
+  color:white;
+
+  font-size:30px;
+  font-weight:700;
+
+  box-shadow:
+    0 7px 25px rgba(224,90,78,.45),
+    0 3px 8px rgba(0,0,0,.4);
+}
+
+.fab:active{
+  transform:scale(.93);
+}
+
+/* LIST */
+
+.board{
+  padding:12px;
+  padding-bottom:110px;
+}
+
+.row{
+  background:var(--panel);
+  border:1px solid var(--line);
+  border-radius:11px;
+  padding:12px;
+  margin-bottom:10px;
+
+  display:grid;
+  grid-template-columns:44px 1fr;
+  gap:10px;
+
+  box-shadow:0 3px 14px rgba(0,0,0,.25);
+}
+
+.badge{
+  width:40px;
+  height:46px;
+  border-radius:10px;
+  background:var(--amber);
+  color:#1a1206;
+
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  align-items:center;
+
+  font-size:18px;
+}
+
+.badge.aging{
+  background:var(--amberDim);
+  color:white;
+}
+
+.badge.stale{
+  background:#596174;
+  color:white;
+}
+
+.loc{
+  font-size:14px;
+  font-weight:700;
+}
+
+.meta{
+  margin-top:4px;
+  color:var(--grey);
+  font-family:monospace;
+  font-size:10.5px;
+  line-height:1.5;
+}
+
+.note{
+  color:var(--grey);
+  font-size:11px;
+  margin-top:4px;
+  font-style:italic;
+}
+
+.actions{
+  grid-column:1/-1;
+  display:flex;
+  gap:7px;
+}
+
+.actions button{
+  flex:1;
+  padding:9px;
+  border-radius:7px;
+  border:1px solid var(--line);
+  background:var(--panel2);
+  color:var(--amber);
+}
+
+.actions .left{
+  color:var(--grey);
+}
+
+/* EMPTY */
+
+.empty{
+  text-align:center;
+  color:var(--greyDim);
+  padding:60px 20px;
+  font-family:monospace;
+  line-height:1.7;
+}
+
+/* OVERLAY */
+
+.overlay{
+  position:fixed;
+  inset:0;
+  z-index:2000;
+  background:rgba(0,0,0,.7);
+
+  opacity:0;
+  pointer-events:none;
+
+  transition:.2s;
+}
+
+.overlay.show{
+  opacity:1;
+  pointer-events:auto;
+}
+
+/* SHEET */
+
+.sheet{
+  position:fixed;
+  left:0;
+  right:0;
+  bottom:0;
+  z-index:2100;
+
+  background:var(--panel2);
+
+  border-radius:18px 18px 0 0;
+  border-top:1px solid var(--line);
+
+  padding:
+    18px
+    16px
+    calc(20px + env(safe-area-inset-bottom));
+
+  max-height:90vh;
+  overflow-y:auto;
+
+  transform:translateY(105%);
+  transition:
+    transform .28s cubic-bezier(.32,.72,0,1);
+
+  box-shadow:0 -12px 40px rgba(0,0,0,.55);
+}
+
+.sheet.show{
+  transform:translateY(0);
+}
+
+.sheet h2{
+  margin:0;
+  color:var(--amber);
+  font-family:monospace;
+  letter-spacing:2px;
+}
+
+.sub{
+  color:var(--grey);
+  font-size:11px;
+  margin:5px 0 15px;
+}
+
+.field{
+  margin-bottom:13px;
+}
+
+label{
+  display:block;
+  color:var(--grey);
+  font-size:10px;
+  letter-spacing:1px;
+  text-transform:uppercase;
+  margin-bottom:6px;
+}
+
+input{
+  width:100%;
+  padding:11px;
+  border-radius:8px;
+  border:1px solid var(--line);
+  background:var(--black);
+  color:white;
+  font-size:14px;
+}
+
+input:focus{
+  outline:none;
+  border-color:var(--amber);
+}
+
+/* PICK MAP */
+
+#pickMap{
+  height:190px;
+  width:100%;
+  border-radius:10px;
+  overflow:hidden;
+  border:1px solid var(--line);
+}
+
+.pickHint{
+  color:var(--greyDim);
+  font-size:10px;
+  margin-top:5px;
+}
+
+/* CHIPS */
+
+.chips{
+  display:flex;
+  flex-wrap:wrap;
+  gap:7px;
+}
+
+.chip,
+.mode{
+  border:1px solid var(--line);
+  background:var(--black);
+  color:var(--grey);
+
+  padding:8px 11px;
+  border-radius:8px;
+
+  font-family:monospace;
+  font-weight:700;
+}
+
+.chip.selected,
+.mode.selected{
+  background:var(--amber);
+  border-color:var(--amber);
+  color:#1a1206;
+}
+
+.modeRow{
+  display:flex;
+  gap:8px;
+}
+
+.mode{
+  flex:1;
+  font-family:inherit;
+}
+
+/* BUTTONS */
+
+.submit{
+  width:100%;
+  border:none;
+  border-radius:10px;
+  padding:13px;
+
+  background:linear-gradient(145deg,#eb6a5d,var(--red));
+  color:white;
+
+  font-size:14px;
+  font-weight:800;
+}
+
+.submit:disabled{
+  opacity:.4;
+}
+
+.cancel{
+  width:100%;
+  border:none;
+  background:none;
+  color:var(--grey);
+  padding:11px;
+}
+
+/* TOAST */
+
+.toast{
+  position:fixed;
+  z-index:3000;
+  top:15px;
+  left:50%;
+
+  transform:translate(-50%,-20px);
+
+  background:var(--panel2);
+  border:1px solid var(--amberDim);
+
+  color:var(--amber);
+
+  padding:9px 14px;
+  border-radius:9px;
+
+  font-family:monospace;
+  font-size:11px;
+
+  opacity:0;
+  pointer-events:none;
+
+  transition:.25s;
+}
+
+.toast.show{
+  opacity:1;
+  transform:translate(-50%,0);
+}
+
+/* DESKTOP */
+
+@media(min-width:700px){
+
+  body{
+    max-width:700px;
+    margin:auto;
+    border-left:1px solid var(--line);
+    border-right:1px solid var(--line);
+  }
+
+  .mapContainer{
+    height:calc(100vh - 155px);
+  }
+
+}
+
+/* PREVENT IOS TEXT SELECTION ON UI */
+
+button{
+  cursor:pointer;
+  -webkit-user-select:none;
+  user-select:none;
+}
+</style>
+</head>
+
+<body>
+
+<header class="header">
+
+  <div class="brandRow">
+
+    <div class="brand">
+
+      <div class="brandIcon">👮</div>
+
+      <div>
+        <div class="brandTitle">
+          ALERTE CONTRÔLEUR
+        </div>
+
+        <div class="brandSub">
+          Réseau tram & bus · Grenoble
+        </div>
+      </div>
+
+    </div>
+
+    <button class="profile" id="profileBtn">
+      ?
+    </button>
+
+  </div>
+
+  <div class="tabs">
+
+    <button class="tab active" data-view="map">
+      Carte
+    </button>
+
+    <button class="tab" data-view="list">
+      Liste
+    </button>
+
+    <button class="tab" data-view="mine">
+      Mes signalements
+    </button>
+
+  </div>
+
+  <div class="stats">
+
+    <div>
+      <b id="statActive">0</b>
+      actif(s)
+    </div>
+
+    <div>
+      <b id="statFresh">0</b>
+      récents &lt;10 min
+    </div>
+
+  </div>
+
+</header>
+
+
+<!-- MAP VIEW -->
+
+<section class="view active" id="viewMap">
+
+  <div class="mapContainer">
+
+    <div class="mapTop">
+      Touchez un 👮 pour voir le signalement
+    </div>
+
+    <div id="map"></div>
+
+  </div>
+
+</section>
+
+
+<!-- LIST -->
+
+<section class="view" id="viewList">
+
+  <div class="board" id="boardList"></div>
+
+</section>
+
+
+<!-- MY REPORTS -->
+
+<section class="view" id="viewMine">
+
+  <div class="board" id="boardMine"></div>
+
+</section>
+
+
+<!-- FAB -->
+
+<button class="fab" id="fab">
+  +
+</button>
+
+
+<!-- REPORT OVERLAY -->
+
+<div class="overlay" id="reportOverlay"></div>
+
+
+<!-- REPORT SHEET -->
+
+<div class="sheet" id="reportSheet">
+
+  <h2>SIGNALER</h2>
+
+  <div class="sub">
+    Touchez la carte pour placer approximativement le contrôle.
+  </div>
+
+
+  <!-- PICK MAP -->
+
+  <div class="field">
+
+    <label>
+      Localisation
+    </label>
+
+    <div id="pickMap"></div>
+
+    <div class="pickHint" id="pickHint">
+      Touchez la carte
+    </div>
+
+  </div>
+
+
+  <!-- MODE -->
+
+  <div class="field">
+
+    <label>
+      Mode
+    </label>
+
+    <div class="modeRow">
+
+      <button class="mode selected" data-mode="Bus">
+        🚌 Bus
+      </button>
+
+      <button class="mode" data-mode="Tram">
+        🚊 Tram
+      </button>
+
+    </div>
+
+  </div>
+
+
+  <!-- LINE -->
+
+  <div class="field">
+
+    <label>
+      Ligne
+    </label>
+
+    <div class="chips" id="lineChips">
+
+      <button class="chip">C1</button>
+      <button class="chip">C2</button>
+      <button class="chip">C3</button>
+      <button class="chip">C4</button>
+      <button class="chip">C5</button>
+      <button class="chip">C6</button>
+      <button class="chip">C7</button>
+
+      <button class="chip">
+        Autre…
+      </button>
+
+    </div>
+
+  </div>
+
+
+  <!-- CUSTOM LINE -->
+
+  <div
+    class="field"
+    id="customLineField"
+    style="display:none;"
+  >
+
+    <label>
+      Numéro / nom de ligne
+    </label>
+
+    <input
+      id="customLine"
+      type="text"
+      placeholder="ex : 51, Proximo..."
+    >
+
+  </div>
+
+
+  <!-- LOCATION -->
+
+  <div class="field">
+
+    <label>
+      Arrêt / repère
+    </label>
+
+    <input
+      id="locationInput"
+      type="text"
+      placeholder="ex : Victor Hugo"
+      autocomplete="off"
+    >
+
+  </div>
+
+
+  <!-- NOTE -->
+
+  <div class="field">
+
+    <label>
+      Note facultative
+    </label>
+
+    <input
+      id="noteInput"
+      type="text"
+      placeholder="ex : 3 agents"
+    >
+
+  </div>
+
+
+  <button
+    class="submit"
+    id="submitBtn"
+    disabled
+  >
+    Envoyer le signalement
+  </button>
+
+  <button
+    class="cancel"
+    id="cancelBtn"
+  >
+    Annuler
+  </button>
+
+</div>
+
+
+<!-- PROFILE -->
+
+<div class="overlay" id="profileOverlay"></div>
+
+<div class="sheet" id="profileSheet">
+
+  <h2>PROFIL</h2>
+
+  <div class="sub">
+    Votre pseudo est uniquement utilisé pour reconnaître
+    vos propres signalements.
+  </div>
+
+  <div class="field">
+
+    <label>
+      Pseudo
+    </label>
+
+    <input
+      id="nickname"
+      type="text"
+      placeholder="ex : Alex_G"
+    >
+
+  </div>
+
+  <button
+    class="submit"
+    id="saveProfile"
+    style="background:var(--amber);color:#151006;"
+  >
+    Enregistrer
+  </button>
+
+  <button
+    class="cancel"
+    id="closeProfile"
+  >
+    Fermer
+  </button>
+
+</div>
+
+
+<div class="toast" id="toast"></div>
+
+
+<script>
+
+/* =========================================================
+   SUPABASE
+========================================================= */
+
+const SUPABASE_URL =
+  "https://ogqbyjqapgbjmppnzyfm.supabase.co";
+
+const SUPABASE_ANON_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ncWJ5anFhcGdiam1wcG56eWZtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY4ODc5MDksImV4cCI6MjEwMjQ2MzkwOX0.4j7zt1HXrjUmfcRwyNgZHliTP3KXSDttaif30Hy9thA";
+
+const supabase =
+  window.supabase.createClient(
+    SUPABASE_URL,
+    SUPABASE_ANON_KEY
+  );
+
+
+/* =========================================================
+   CONFIG
+========================================================= */
+
+const FRESH_MIN = 10;
+const AGING_MIN = 25;
+const EXPIRE_MIN = 45;
+
+
+/* =========================================================
+   STATE
+========================================================= */
+
+let reports = [];
+let myReports = [];
+
+let profile = {
+  id:null,
+  nickname:""
+};
+
+let selectedMode = "Bus";
+let selectedLine = null;
+let pickedLatLng = null;
+
+let map;
+let pickMap;
+
+let markers = new Map();
+
+let voted = new Set();
+
+
+/* =========================================================
+   HELPERS
+========================================================= */
+
+const $ = id =>
+  document.getElementById(id);
+
+
+function toast(message){
+
+  const t = $("toast");
+
+  t.textContent = message;
+
+  t.classList.add("show");
+
+  setTimeout(()=>{
+    t.classList.remove("show");
+  },1800);
+}
+
+
+function escapeHtml(value){
+
+  return String(value || "")
+    .replace(/[&<>"']/g,c=>({
+      "&":"&amp;",
+      "<":"&lt;",
+      ">":"&gt;",
+      '"':"&quot;",
+      "'":"&#39;"
+    }[c]));
+
+}
+
+
+function ageMinutes(report){
+
+  return (
+    Date.now() -
+    report.timestamp
+  ) / 60000;
+
+}
+
+
+function ageClass(age){
+
+  if(age < FRESH_MIN)
+    return "fresh";
+
+  if(age < AGING_MIN)
+    return "aging";
+
+  return "stale";
+
+}
+
+
+function ageText(age){
+
+  if(age < 1)
+    return "à l'instant";
+
+  return "il y a " +
+    Math.floor(age) +
+    " min";
+
+}
+
+
+function dateText(timestamp){
+
+  return new Date(timestamp)
+    .toLocaleTimeString(
+      "fr-FR",
+      {
+        hour:"2-digit",
+        minute:"2-digit"
+      }
+    );
+
+}
+
+
+function visibleReport(r){
+
+  const age = ageMinutes(r);
+
+  if(age >= EXPIRE_MIN)
+    return false;
+
+  if((r.leftCount || 0) >= 10)
+    return false;
+
+  return true;
+
+}
+
+
+/* =========================================================
+   PROFILE / ANONYMOUS AUTH
+========================================================= */
+
+async function initProfile(){
+
+  let {
+    data:{session}
+  } =
+    await supabase.auth.getSession();
+
+
+  if(!session){
+
+    const result =
+      await supabase.auth.signInAnonymously();
+
+    if(result.error){
+
+      console.error(result.error);
+
+      toast(
+        "Erreur de connexion Supabase"
+      );
+
+      return false;
+    }
+
+    session = result.data.session;
+
+  }
+
+
+  profile.id =
+    session.user.id;
+
+
+  const result =
+    await supabase
+      .from("profiles")
+      .select("nickname")
+      .eq("id",profile.id)
+      .maybeSingle();
+
+
+  if(result.data){
+
+    profile.nickname =
+      result.data.nickname || "";
+
+  }
+
+
+  updateProfileButton();
+
+  return true;
+
+}
+
+
+function updateProfileButton(){
+
+  $("profileBtn").textContent =
+    profile.nickname
+      ? profile.nickname
+          .slice(0,2)
+          .toUpperCase()
+      : "?";
+
+}
+
+
+/* =========================================================
+   MAIN MAP
+========================================================= */
+
+function initMap(){
+
+  map = L.map("map",{
+    zoomControl:true,
+    attributionControl:true,
+    tap:true
+  });
+
+
+  L.tileLayer(
+    "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+    {
+      maxZoom:19,
+      attribution:
+        '&copy; OpenStreetMap contributors'
+    }
+  ).addTo(map);
+
+
+  map.setView(
+    [45.1885,5.7245],
+    13
+  );
+
+
+  setTimeout(()=>{
+    map.invalidateSize();
+  },300);
+
+}
+
+
+/* =========================================================
+   PICK MAP
+========================================================= */
+
+function initPickMap(){
+
+  pickMap =
+    L.map("pickMap",{
+      zoomControl:true,
+      attributionControl:false
+    });
+
+
+  L.tileLayer(
+    "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+    {
+      maxZoom:19
+    }
+  ).addTo(pickMap);
+
+
+  pickMap.setView(
+    [45.1885,5.7245],
+    13
+  );
+
+
+  pickMap.on("click",e=>{
+
+    pickedLatLng =
+      e.latlng;
+
+    placePickMarker(
+      e.latlng
+    );
+
+    validate();
+
+  });
+
+}
+
+
+let pickMarker = null;
+
+
+function placePickMarker(latlng){
+
+  if(pickMarker)
+    pickMarker.remove();
+
+
+  pickMarker =
+    L.marker(latlng,{
+      draggable:true
+    }).addTo(pickMap);
+
+
+  pickMarker.on(
+    "dragend",
+    ()=>{
+      pickedLatLng =
+        pickMarker.getLatLng();
+
+      validate();
+    }
+  );
+
+
+  $("pickHint").textContent =
+    "Point placé ✓ — vous pouvez le déplacer";
+
+}
+
+
+/* =========================================================
+   CUSTOM MARKER
+========================================================= */
+
+function markerIcon(report){
+
+  const cls =
+    ageClass(
+      ageMinutes(report)
+    );
+
+
+  return L.divIcon({
+
+    className:"",
+
+    html:`
+      <div class="controlMarker ${cls}">
+        <span>👮</span>
+      </div>
+    `,
+
+    iconSize:[38,38],
+
+    iconAnchor:[19,38],
+
+    popupAnchor:[0,-34]
+
+  });
+
+}
+
+
+/* =========================================================
+   RENDER MAP
+========================================================= */
+
+function renderMap(){
+
+  markers.forEach(
+    marker=>marker.remove()
+  );
+
+  markers.clear();
+
+
+  reports
+    .filter(visibleReport)
+    .forEach(report=>{
+
+      if(
+        !report.latitude ||
+        !report.longitude
+      )
+        return;
+
+
+      const marker =
+        L.marker(
+          [
+            report.latitude,
+            report.longitude
+          ],
+          {
+            icon:markerIcon(report)
+          }
+        ).addTo(map);
+
+
+      marker.bindPopup(
+        createPopup(report)
+      );
+
+
+      markers.set(
+        report.id,
+        marker
+      );
+
+    });
+
+}
+
+
+/* =========================================================
+   POPUP
+========================================================= */
+
+function createPopup(report){
+
+  const age =
+    ageMinutes(report);
+
+
+  return `
+
+    <div>
+
+      <div class="popupTitle">
+        ${escapeHtml(report.mode)}
+        ${escapeHtml(report.line)}
+      </div>
+
+      <div class="popupLoc">
+        ${escapeHtml(report.location)}
+      </div>
+
+      <div class="popupMeta">
+        ${ageText(age)}
+        · ${dateText(report.timestamp)}
+        ${
+          report.stillCount
+            ? " · ✓ " + report.stillCount
+            : ""
+        }
+      </div>
+
+      ${
+        report.note
+          ? `
+            <div class="popupNote">
+              ${escapeHtml(report.note)}
+            </div>
+          `
+          :""
+      }
+
+      <div class="popupButtons">
+
+        <button
+          onclick="vote('${report.id}','confirm')"
+        >
+          Toujours là
+        </button>
+
+        <button
+          onclick="vote('${report.id}','left')"
+        >
+          Parti
+        </button>
+
+      </div>
+
+    </div>
+
+  `;
+
+}
+
+
+/* =========================================================
+   DATABASE
+========================================================= */
+
+function mapReport(row){
+
+  return {
+
+    id:row.id,
+
+    latitude:Number(
+      row.latitude
+    ),
+
+    longitude:Number(
+      row.longitude
+    ),
+
+    mode:
+      row.transport_type,
+
+    line:
+      row.line,
+
+    location:
+      row.location_name,
+
+    note:
+      row.note || "",
+
+    timestamp:
+      new Date(
+        row.created_at
+      ).getTime(),
+
+    stillCount:
+      Number(
+        row.still_here_count || 0
+      ),
+
+    leftCount:
+      Number(
+        row.left_count || 0
+      ),
+
+    reporterId:
+      row.user_id || null
+
+  };
+
+}
+
+
+async function loadReports(){
+
+  const {
+    data,
+    error
+  } =
+    await supabase
+      .from("reports_public")
+      .select("*")
+      .order(
+        "created_at",
+        {
+          ascending:false
+        }
+      );
+
+
+  if(error){
+
+    console.error(
+      "loadReports:",
+      error
+    );
+
+    return;
+
+  }
+
+
+  reports =
+    (data || [])
+      .map(mapReport);
+
+}
+
+
+async function loadMyReports(){
+
+  if(!profile.id)
+    return;
+
+
+  const {
+    data,
+    error
+  } =
+    await supabase
+      .from("reports")
+      .select("*")
+      .eq(
+        "user_id",
+        profile.id
+      )
+      .order(
+        "created_at",
+        {
+          ascending:false
+        }
+      );
+
+
+  if(error){
+
+    console.error(
+      "loadMyReports:",
+      error
+    );
+
+    return;
+
+  }
+
+
+  myReports =
+    (data || [])
+      .map(mapReport);
+
+}
+
+
+/* =========================================================
+   LIST
+========================================================= */
+
+function renderList(){
+
+  renderReportList(
+    reports.filter(visibleReport),
+    $("boardList"),
+    false
+  );
+
+
+  renderReportList(
+    myReports,
+    $("boardMine"),
+    true
+  );
+
+}
+
+
+function renderReportList(
+  list,
+  container,
+  mine
+){
+
+  container.innerHTML = "";
+
+
+  if(!list.length){
+
+    container.innerHTML = `
+
+      <div class="empty">
+
+        ◌
+
+        <br><br>
+
+        ${
+          mine
+            ? "Vous n'avez pas encore de signalement."
+            : "Aucun contrôle signalé."
+        }
+
+      </div>
+
+    `;
+
+    return;
+
+  }
+
+
+  list.forEach(report=>{
+
+    const age =
+      ageMinutes(report);
+
+
+    const row =
+      document.createElement("div");
+
+
+    row.className =
+      "row";
+
+
+    row.innerHTML = `
+
+      <div class="badge ${ageClass(age)}">
+
+        👮
+
+        <small>
+          ${escapeHtml(report.line)}
+        </small>
+
+      </div>
+
+
+      <div>
+
+        <div class="loc">
+
+          ${escapeHtml(report.location)}
+
+        </div>
+
+
+        <div class="meta">
+
+          ${escapeHtml(report.mode)}
+
+          ·
+
+          ${ageText(age)}
+
+          ·
+
+          ${dateText(report.timestamp)}
+
+          ${
+            report.stillCount
+              ? " · ✓ " +
+                report.stillCount
+              : ""
+          }
+
+        </div>
+
+
+        ${
+          report.note
+            ? `
+              <div class="note">
+                ${escapeHtml(report.note)}
+              </div>
+            `
+            :""
+        }
+
+      </div>
+
+
+      ${
+        mine
+          ? ""
+          : `
+
+            <div class="actions">
+
+              <button
+                data-vote="${report.id}"
+                data-action="confirm"
+              >
+                Toujours là
+              </button>
+
+              <button
+                class="left"
+                data-vote="${report.id}"
+                data-action="left"
+              >
+                Parti
+              </button>
+
+            </div>
+
+          `
+      }
+
+    `;
+
+
+    container.appendChild(row);
+
+  });
+
+}
+
+
+/* =========================================================
+   VOTE
+========================================================= */
+
+async function vote(
+  reportId,
+  action
+){
+
+  const key =
+    reportId + ":" + action;
+
+
+  if(voted.has(key)){
+
+    toast(
+      "Déjà pris en compte"
+    );
+
+    return;
+
+  }
+
+
+  const {
+    error
+  } =
+    await supabase
+      .from("report_confirmations")
+      .insert({
+
+        report_id:
+          reportId,
+
+        user_id:
+          profile.id,
+
+        action:
+          action
+
+      });
+
+
+  if(error){
+
+    if(
+      error.code ===
+      "23505"
+    ){
+
+      voted.add(key);
+
+      toast(
+        "Déjà pris en compte"
+      );
+
+    }else{
+
+      console.error(error);
+
+      toast(
+        "Erreur, réessayez"
+      );
+
+    }
+
+    return;
+
+  }
+
+
+  voted.add(key);
+
+
+  toast(
+    action === "confirm"
+      ? "Contrôle confirmé ✓"
+      : "Départ signalé"
+  );
+
+
+  await refresh();
+
+}
+
+
+window.vote = vote;
+
+
+/* =========================================================
+   REPORT FORM
+========================================================= */
+
+function validate(){
+
+  const valid =
+    selectedLine &&
+    selectedLine.trim() &&
+    $("locationInput")
+      .value
+      .trim() &&
+    pickedLatLng;
+
+
+  $("submitBtn").disabled =
+    !valid;
+
+}
+
+
+/* LINE */
+
+document
+  .getElementById("lineChips")
+  .addEventListener(
+    "click",
+    e=>{
+
+      const chip =
+        e.target.closest(".chip");
+
+
+      if(!chip)
+        return;
+
+
+      document
+        .querySelectorAll(
+          "#lineChips .chip"
+        )
+        .forEach(
+          c=>c.classList.remove(
+            "selected"
+          )
+        );
+
+
+      chip.classList.add(
+        "selected"
+      );
+
+
+      if(
+        chip.textContent.trim()
+        === "Autre…"
+      ){
+
+        selectedLine = "";
+
+        $("customLineField")
+          .style
+          .display="block";
+
+        $("customLine")
+          .focus();
+
+      }else{
+
+        selectedLine =
+          chip.textContent.trim();
+
+        $("customLineField")
+          .style
+          .display="none";
+
+      }
+
+
+      validate();
+
+    }
+  );
+
+
+/* CUSTOM LINE */
+
+$("customLine")
+  .addEventListener(
+    "input",
+    ()=>{
+
+      selectedLine =
+        $("customLine")
+          .value
+          .trim();
+
+      validate();
+
+    }
+  );
+
+
+/* MODE */
+
+document
+  .querySelectorAll(".mode")
+  .forEach(button=>{
+
+    button.addEventListener(
+      "click",
+      ()=>{
+
+        document
+          .querySelectorAll(".mode")
+          .forEach(
+            b=>b.classList.remove(
+              "selected"
+            )
+          );
+
+
+        button.classList.add(
+          "selected"
+        );
+
+
+        selectedMode =
+          button.dataset.mode;
+
+
+        selectedLine =
+          null;
+
+
+        document
+          .querySelectorAll(
+            "#lineChips .chip"
+          )
+          .forEach(
+            c=>c.classList.remove(
+              "selected"
+            )
+          );
+
+
+        $("customLineField")
+          .style
+          .display="none";
+
+
+        validate();
+
+      }
+    );
+
+  });
+
+
+$("locationInput")
+  .addEventListener(
+    "input",
+    validate
+  );
+
+
+/* =========================================================
+   OPEN REPORT SHEET
+========================================================= */
+
+function openReportSheet(){
+
+  $("reportOverlay")
+    .classList.add("show");
+
+  $("reportSheet")
+    .classList.add("show");
+
+
+  setTimeout(()=>{
+
+    pickMap.invalidateSize();
+
+    if(pickedLatLng){
+
+      pickMap.setView(
+        pickedLatLng,
+        15
+      );
+
+    }else{
+
+      pickMap.setView(
+        [45.1885,5.7245],
+        13
+      );
+
+    }
+
+  },300);
+
+}
+
+
+function closeReportSheet(){
+
+  $("reportOverlay")
+    .classList.remove("show");
+
+  $("reportSheet")
+    .classList.remove("show");
+
+
+  selectedLine =
+    null;
+
+  pickedLatLng =
+    null;
+
+
+  $("locationInput")
+    .value="";
+
+  $("noteInput")
+    .value="";
+
+  $("customLine")
+    .value="";
+
+
+  $("customLineField")
+    .style
+    .display="none";
+
+
+  document
+    .querySelectorAll(
+      "#lineChips .chip"
+    )
+    .forEach(
+      c=>c.classList.remove(
+        "selected"
+      )
+    );
+
+
+  if(pickMarker){
+
+    pickMarker.remove();
+
+    pickMarker =
+      null;
+
+  }
+
+
+  $("pickHint")
+    .textContent =
+    "Touchez la carte";
+
+
+  validate();
+
+}
+
+
+/* FAB */
+
+$("fab")
+  .addEventListener(
+    "click",
+    openReportSheet
+  );
+
+
+$("cancelBtn")
+  .addEventListener(
+    "click",
+    closeReportSheet
+  );
+
+
+$("reportOverlay")
+  .addEventListener(
+    "click",
+    closeReportSheet
+  );
+
+
+/* =========================================================
+   SUBMIT
+========================================================= */
+
+$("submitBtn")
+  .addEventListener(
+    "click",
+    async ()=>{
+
+      if(
+        $("submitBtn")
+          .disabled
+      )
+        return;
+
+
+      $("submitBtn")
+        .disabled=true;
+
+
+      const {
+        lat,
+        lng
+      } =
+        pickedLatLng;
+
+
+      const {
+        error
+      } =
+        await supabase
+          .from("reports")
+          .insert({
+
+            user_id:
+              profile.id,
+
+            latitude:
+              lat,
+
+            longitude:
+              lng,
+
+            transport_type:
+              selectedMode,
+
+            line:
+              selectedLine,
+
+            location_name:
+              $("locationInput")
+                .value
+                .trim(),
+
+            note:
+              $("noteInput")
+                .value
+                .trim() || null
+
+          });
+
+
+      if(error){
+
+        console.error(error);
+
+        if(
+          error.message
+            ?.includes(
+              "COOLDOWN_ACTIVE"
+            )
+        ){
+
+          toast(
+            "Attendez avant un nouveau signalement"
+          );
+
+        }else if(
+          error.message
+            ?.includes(
+              "DAILY_LIMIT_REACHED"
+            )
+        ){
+
+          toast(
+            "Limite quotidienne atteinte"
+          );
+
+        }else{
+
+          toast(
+            "Erreur d'envoi"
+          );
+
+        }
+
+
+        $("submitBtn")
+          .disabled=false;
+
+        return;
+
+      }
+
+
+      closeReportSheet();
+
+
+      toast(
+        "Signalement envoyé ✓"
+      );
+
+
+      await refresh();
+
+    }
+  );
+
+
+/* =========================================================
+   PROFILE
+========================================================= */
+
+$("profileBtn")
+  .addEventListener(
+    "click",
+    ()=>{
+
+      $("nickname")
+        .value =
+        profile.nickname || "";
+
+
+      $("profileOverlay")
+        .classList.add("show");
+
+      $("profileSheet")
+        .classList.add("show");
+
+    }
+  );
+
+
+function closeProfile(){
+
+  $("profileOverlay")
+    .classList.remove("show");
+
+  $("profileSheet")
+    .classList.remove("show");
+
+}
+
+
+$("closeProfile")
+  .addEventListener(
+    "click",
+    closeProfile
+  );
+
+
+$("profileOverlay")
+  .addEventListener(
+    "click",
+    closeProfile
+  );
+
+
+$("saveProfile")
+  .addEventListener(
+    "click",
+    async ()=>{
+
+      const nickname =
+        $("nickname")
+          .value
+          .trim();
+
+
+      const {
+        error
+      } =
+        await supabase
+          .from("profiles")
+          .update({
+            nickname
+          })
+          .eq(
+            "id",
+            profile.id
+          );
+
+
+      if(error){
+
+        console.error(error);
+
+        toast(
+          "Erreur d'enregistrement"
+        );
+
+        return;
+
+      }
+
+
+      profile.nickname =
+        nickname;
+
+
+      updateProfileButton();
+
+      closeProfile();
+
+      toast(
+        "Profil enregistré ✓"
+      );
+
+    }
+  );
+
+
+/* =========================================================
+   TABS
+========================================================= */
+
+document
+  .querySelectorAll(".tab")
+  .forEach(tab=>{
+
+    tab.addEventListener(
+      "click",
+      ()=>{
+
+        document
+          .querySelectorAll(".tab")
+          .forEach(
+            t=>t.classList.remove(
+              "active"
+            )
+          );
+
+
+        tab.classList.add(
+          "active"
+        );
+
+
+        document
+          .querySelectorAll(".view")
+          .forEach(
+            v=>v.classList.remove(
+              "active"
+            )
+          );
+
+
+        const target =
+          "view" +
+          tab.dataset.view
+            .charAt(0)
+            .toUpperCase() +
+          tab.dataset.view
+            .slice(1);
+
+
+        $(target)
+          .classList.add(
+            "active"
+          );
+
+
+        if(
+          tab.dataset.view ===
+          "map"
+        ){
+
+          setTimeout(
+            ()=>map.invalidateSize(),
+            100
+          );
+
+        }
+
+      }
+    );
+
+  });
+
+
+/* =========================================================
+   LIST BUTTON EVENTS
+========================================================= */
+
+document.addEventListener(
+  "click",
+  e=>{
+
+    const button =
+      e.target.closest(
+        "[data-vote]"
+      );
+
+
+    if(!button)
+      return;
+
+
+    vote(
+      button.dataset.vote,
+      button.dataset.action
+    );
+
+  }
+);
+
+
+/* =========================================================
+   STATS
+========================================================= */
+
+function renderStats(){
+
+  const visible =
+    reports.filter(
+      visibleReport
+    );
+
+
+  $("statActive")
+    .textContent =
+    visible.length;
+
+
+  $("statFresh")
+    .textContent =
+    visible.filter(
+      r=>
+        ageMinutes(r)
+        < FRESH_MIN
+    ).length;
+
+}
+
+
+/* =========================================================
+   REFRESH
+========================================================= */
+
+async function refresh(){
+
+  await loadReports();
+
+  await loadMyReports();
+
+  renderStats();
+
+  renderMap();
+
+  renderList();
+
+}
+
+
+/* =========================================================
+   START
+========================================================= */
+
+(async function(){
+
+  const connected =
+    await initProfile();
+
+
+  if(!connected)
+    return;
+
+
+  initMap();
+
+  initPickMap();
+
+
+  await refresh();
+
+
+  /*
+    تحديث البيانات كل 8 ثوانٍ
+  */
+
+  setInterval(
+    refresh,
+    8000
+  );
+
+
+  /*
+    تحديث عمر البلاغات
+    بدون إعادة تحميل قاعدة البيانات
+  */
+
+  setInterval(
+    ()=>{
+      renderStats();
+      renderMap();
+      renderList();
+    },
+    30000
+  );
+
+
+})();
+
+</script>
+
+</body>
+</html>
