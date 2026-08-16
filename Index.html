@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Alerte contrôleur BUS 👮 · Réseau Grenoble</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --board-black:#0d1017;
+    --board-panel:#161b26;
+    --board-panel-2:#1c2333;
+    --led-amber:#e8a33d;
+    --led-amber-dim:#7a6636;
+    --led-amber-glow: rgba(232,163,61,0.35);
+    --signal-red:#e05a4e;
+    --confirm-green:#45b58a;
+    --text-grey:#98a1b3;
+    --text-grey-dim:#5c6478;
+    --hairline: rgba(255,255,255,0.08);
+    --font-mono: 'Courier New', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --font-ui: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --line-a:#e8432b; --line-b:#c98a2e; --line-c:#4fbf82; --line-d:#9b6fe0; --line-e:#4fa3d1;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;background:var(--board-black);color:var(--led-amber);font-family:var(--font-ui);height:100%;}
+  body{display:flex; flex-direction:column; height:100vh; overflow:hidden;
+    background:
+      radial-gradient(circle at 15% 0%, rgba(232,163,61,0.06), transparent 45%),
+      radial-gradient(circle at 100% 100%, rgba(79,163,209,0.05), transparent 40%),
+      var(--board-black);
+  }
+
+  .shieldIcon{display:inline-block; vertical-align:middle; filter:drop-shadow(0 0 4px rgba(232,163,61,0.35));}
+
+  .header{padding:16px 16px 12px; border-bottom:1px solid var(--hairline);
+    background:linear-gradient(180deg, rgba(255,255,255,0.03), transparent), var(--board-panel);
+    box-shadow:0 4px 20px rgba(0,0,0,0.35);
+    flex-shrink:0; position:relative; z-index:2;}
+  .brand-row{display:flex; align-items:center; justify-content:space-between; gap:10px;}
+  .brand-mark{display:flex; align-items:center; gap:9px;}
+  .brand{font-family:var(--font-mono); font-weight:700; font-size:16.5px; letter-spacing:1.2px; text-shadow:0 0 10px var(--led-amber-glow);}
+  .brand small{display:block; font-family:var(--font-ui); font-weight:400; letter-spacing:0.5px; font-size:10.5px; color:var(--text-grey); text-shadow:none; margin-top:3px;}
+  .profileBtn{width:32px; height:32px; border-radius:50%; border:1.5px solid var(--led-amber-dim); background:var(--board-panel-2); color:var(--led-amber); font-family:var(--font-mono); font-weight:700; font-size:12px; display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,0.3);}
+  .tabs{display:flex; gap:6px; margin-top:14px;}
+  .tab{flex:1; text-align:center; padding:9px; border-radius:8px; border:1px solid var(--hairline); background:var(--board-black); color:var(--text-grey); font-size:12.5px; font-weight:600; cursor:pointer; font-family:var(--font-ui); transition:all .15s;}
+  .tab.active{background:var(--led-amber); color:#1a1206; border-color:var(--led-amber); box-shadow:0 3px 12px rgba(232,163,61,0.3);}
+  .stat-row{display:flex; gap:16px; margin-top:12px; font-family:var(--font-mono); font-size:11px; color:var(--text-grey);}
+  .stat-row b{color:var(--led-amber); font-size:13px;}
+
+  .view{flex:1; min-height:0; display:none; position:relative;}
+  .view.active{display:block;}
+
+  /* ---- schematic map ---- */
+  .mapWrap{width:100%; height:100%; position:relative; overflow:hidden; background:#10141f;}
+  .mapWrap svg{width:100%; height:100%; display:block;}
+  .mapHint{position:absolute; top:10px; left:50%; transform:translateX(-50%); background:rgba(22,27,38,0.92); border:1px solid var(--hairline); color:var(--text-grey); font-size:11px; padding:6px 12px; border-radius:20px; pointer-events:none; z-index:5; white-space:nowrap; box-shadow:0 4px 14px rgba(0,0,0,0.35);}
+  .marker{position:absolute; width:32px; height:36px; margin-left:-16px; margin-top:-32px; cursor:pointer; z-index:6;
+    clip-path: polygon(50% 0%, 100% 22%, 100% 58%, 50% 100%, 0% 58%, 0% 22%);
+    display:flex; flex-direction:column; align-items:center; justify-content:center; padding-bottom:5px; gap:1px;
+    font-family:var(--font-mono); font-size:9.5px; font-weight:700;
+    filter:drop-shadow(0 3px 6px rgba(0,0,0,0.5));}
+  .marker.fresh{background:var(--led-amber); color:#1a1206;}
+  .marker.aging{background:var(--led-amber-dim); color:#f2e8d8;}
+  .marker.stale{background:var(--text-grey-dim); color:#e6e9f0;}
+  .pickPin{position:absolute; width:26px; height:26px; margin-left:-13px; margin-top:-26px; z-index:7; pointer-events:none;}
+
+  .infoCard{
+    position:absolute; left:10px; right:10px; bottom:10px; z-index:10;
+    background:var(--board-panel); border:1px solid var(--hairline); border-radius:12px; padding:14px 16px;
+    box-shadow:0 -8px 30px rgba(0,0,0,0.45), 0 8px 24px rgba(0,0,0,0.4);
+    transform:translateY(140%); transition:transform .25s ease-out;
+  }
+  .infoCard.show{transform:translateY(0);}
+  .infoCard .pline{font-family:var(--font-mono); font-weight:700; color:var(--led-amber); font-size:15px;}
+  .infoCard .ploc{font-size:13.5px; margin:3px 0 2px; color:#f2e8d8;}
+  .infoCard .pmeta{font-size:11px; color:var(--text-grey); font-family:var(--font-mono);}
+  .infoCard .pnote{font-size:12px; color:var(--text-grey); font-style:italic; margin-top:4px;}
+  .infoCard .pacts{display:flex; gap:8px; margin-top:9px;}
+  .infoCard .pbtn{flex:1; font-size:11.5px; padding:9px; border-radius:7px; border:1px solid var(--hairline); background:var(--board-panel-2); color:var(--led-amber); cursor:pointer;}
+  .infoCard .pbtn.left{color:var(--text-grey);}
+  .infoCard .pbtn:disabled{opacity:.35;}
+  .infoCard .pdel{margin-top:7px; width:100%; font-size:11px; padding:8px; border-radius:7px; border:1px solid var(--signal-red); background:transparent; color:var(--signal-red); cursor:pointer;}
+  .infoCard .closeCard{position:absolute; top:10px; right:12px; color:var(--text-grey); background:none; border:none; font-size:16px; cursor:pointer;}
+
+  .board{padding:12px; height:100%; overflow-y:auto;}
+  .empty{margin-top:40px; text-align:center; color:var(--text-grey-dim); font-family:var(--font-mono); font-size:13px; line-height:1.8; padding:0 20px;}
+  .empty .glyph{font-size:34px; display:block; margin-bottom:10px; opacity:.5;}
+  .row{background:var(--board-panel); border:1px solid var(--hairline); border-radius:10px; padding:12px 12px 10px; display:grid; grid-template-columns:auto 1fr auto; gap:10px 12px; align-items:center; margin-bottom:10px; animation:rowIn .35s ease-out; box-shadow:0 3px 14px rgba(0,0,0,0.25);}
+  @keyframes rowIn{from{opacity:0; transform:translateY(-6px);} to{opacity:1; transform:translateY(0);}}
+  .badge{font-family:var(--font-mono); font-weight:700; font-size:12px; width:40px; height:46px;
+    clip-path: polygon(50% 0%, 100% 22%, 100% 58%, 50% 100%, 0% 58%, 0% 22%);
+    display:flex; flex-direction:column; align-items:center; justify-content:center; padding-bottom:6px; gap:1px;
+    filter:drop-shadow(0 2px 5px rgba(0,0,0,0.4));}
+  .badge.fresh{background:var(--led-amber); color:#1a1206;}
+  .badge.aging{background:var(--led-amber-dim); color:#f2e8d8;}
+  .badge.stale{background:var(--text-grey-dim); color:#e6e9f0;}
+  .info{min-width:0;}
+  .loc{font-size:14px; font-weight:600; color:#f2e8d8; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .meta{font-family:var(--font-mono); font-size:11px; color:var(--text-grey); margin-top:3px; display:flex; gap:8px; flex-wrap:wrap;}
+  .note{font-size:11.5px; color:var(--text-grey); margin-top:4px; font-style:italic; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .actions{display:flex; flex-direction:column; gap:6px;}
+  .actbtn{font-size:10px; font-weight:600; border:1px solid var(--hairline); background:var(--board-panel-2); border-radius:6px; padding:5px 8px; cursor:pointer; white-space:nowrap; color:var(--led-amber);}
+  .actbtn.left{color:var(--text-grey);}
+  .freshbar{grid-column:1/-1; height:2px; background:var(--hairline); border-radius:2px; overflow:hidden;}
+  .freshbar > div{height:100%; background:var(--led-amber);}
+
+  .fab{position:fixed; right:16px; bottom:20px; z-index:20; width:58px; height:58px; border-radius:50%; background:linear-gradient(145deg, #eb6a5d, var(--signal-red)); color:#fff; border:none; font-size:28px; font-weight:700; line-height:1; box-shadow:0 6px 22px rgba(224,90,78,0.45), 0 2px 6px rgba(0,0,0,0.3); display:flex; align-items:center; justify-content:center; cursor:pointer;}
+  .fab:active{transform:scale(0.94);}
+
+  .overlay{position:fixed; inset:0; background:rgba(6,8,12,0.7); z-index:30; opacity:0; pointer-events:none; transition:opacity .2s;}
+  .overlay.show{opacity:1; pointer-events:auto;}
+  .sheet{position:fixed; left:0; right:0; bottom:0; z-index:31; background:var(--board-panel-2); border-top:1px solid var(--hairline); border-radius:18px 18px 0 0; padding:18px 16px calc(16px + env(safe-area-inset-bottom)); transform:translateY(105%); transition:transform .28s cubic-bezier(.32,.72,0,1); max-height:88vh; overflow-y:auto; box-shadow:0 -12px 40px rgba(0,0,0,0.5);}
+  .sheet.show{transform:translateY(0);}
+  .sheet h2{margin:0 0 4px; font-family:var(--font-mono); letter-spacing:2px; font-size:16px; color:var(--led-amber);}
+  .sheet .sub{font-size:11.5px; color:var(--text-grey); margin-bottom:14px;}
+  .field{margin-bottom:12px;}
+  .field label{display:block; font-size:10.5px; letter-spacing:1px; color:var(--text-grey); margin-bottom:6px; text-transform:uppercase;}
+  .chips{display:flex; flex-wrap:wrap; gap:7px;}
+  .chip{font-family:var(--font-mono); font-weight:700; font-size:12.5px; border:1.5px solid var(--hairline); color:var(--text-grey); background:var(--board-black); border-radius:8px; padding:7px 11px; cursor:pointer;}
+  .chip.selected{color:#1a1206; background:var(--led-amber); border-color:var(--led-amber);}
+  .modechips{display:flex; gap:8px;}
+  .modechip{flex:1; text-align:center; padding:9px; border-radius:8px; border:1.5px solid var(--hairline); color:var(--text-grey); font-weight:600; font-size:12.5px; cursor:pointer; background:var(--board-black);}
+  .modechip.selected{color:#1a1206; background:var(--led-amber); border-color:var(--led-amber);}
+  input[type=text]{width:100%; background:var(--board-black); border:1.5px solid var(--hairline); border-radius:8px; padding:10px 11px; color:#f2e8d8; font-size:13.5px; font-family:var(--font-ui);}
+  input[type=text]:focus{outline:none; border-color:var(--led-amber);}
+  .suggestBox{position:absolute; left:0; right:0; top:calc(100% + 4px); background:var(--board-panel-2); border:1px solid var(--hairline); border-radius:9px; max-height:170px; overflow-y:auto; z-index:25; box-shadow:0 10px 26px rgba(0,0,0,0.5); display:none;}
+  .suggestBox.show{display:block;}
+  .suggestItem{padding:9px 12px; font-size:13px; color:#f2e8d8; cursor:pointer; border-bottom:1px solid var(--hairline);}
+  .suggestItem:last-child{border-bottom:none;}
+  .suggestItem:active{background:var(--board-black);}
+  .suggestItem b{color:var(--led-amber); font-weight:700;}
+
+  @keyframes pulseGlow{
+    0%,100%{box-shadow:0 0 0 0 rgba(232,163,61,0.5), 0 3px 8px rgba(0,0,0,0.4);}
+    50%{box-shadow:0 0 0 7px rgba(232,163,61,0), 0 3px 8px rgba(0,0,0,0.4);}
+  }
+  .marker.fresh, .badge.fresh{animation:pulseGlow 2.2s ease-out infinite;}
+  #pickMapWrap{width:100%; height:170px; border-radius:10px; border:1.5px solid var(--hairline); position:relative; overflow:hidden; background:#10141f;}
+  .pickHint{font-size:10.5px; color:var(--text-grey-dim); margin-top:5px;}
+  .submitbtn{width:100%; background:linear-gradient(145deg, #eb6a5d, var(--signal-red)); color:#fff; border:none; border-radius:10px; padding:13px; font-size:14px; font-weight:700; letter-spacing:0.5px; cursor:pointer; margin-top:4px; box-shadow:0 6px 18px rgba(224,90,78,0.3);}
+  .submitbtn:disabled{opacity:.4; box-shadow:none;}
+  .cancelbtn{width:100%; background:transparent; color:var(--text-grey); border:none; padding:10px; font-size:12.5px; cursor:pointer; margin-top:4px;}
+
+  .disclaimer{font-size:9.5px; color:var(--text-grey-dim); text-align:center; padding:10px 20px 4px; line-height:1.5; flex-shrink:0;}
+  .toast{position:fixed; left:50%; top:14px; transform:translateX(-50%) translateY(-20px); background:var(--board-panel-2); border:1px solid var(--led-amber-dim); color:var(--led-amber); padding:9px 15px; border-radius:9px; font-size:12px; font-family:var(--font-mono); opacity:0; transition:all .25s; z-index:50; pointer-events:none; white-space:nowrap; box-shadow:0 8px 24px rgba(0,0,0,0.4);}
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+</style>
+</head>
+<body>
+
+  <div class="header">
+    <div class="brand-row">
+      <div class="brand-mark">
+        <span style="font-size:24px; line-height:1; filter:drop-shadow(0 0 6px rgba(232,163,61,0.4));">👮</span>
+        <div class="brand">ALERTE CONTRÔLEUR<small>Réseau tram &amp; bus · Grenoble</small></div>
+      </div>
+      <button class="profileBtn" id="profileBtn">?</button>
+    </div>
+    <div class="tabs">
+      <button class="tab active" data-view="map">Carte</button>
+      <button class="tab" data-view="list">Liste</button>
+      <button class="tab" data-view="mine">Mes signalements</button>
+    </div>
+    <div class="stat-row">
+      <div><b id="statActive">0</b> actif(s)</div>
+      <div><b id="statFresh">0</b> récents &lt;10 min</div>
+    </div>
+  </div>
+
+  <div class="view active" id="viewMap">
+    <div class="mapWrap" id="mainMapWrap">
+      <div class="mapHint">Touchez un point pour voir le détail</div>
+      <svg id="mainSvg" viewBox="0 0 400 620" preserveAspectRatio="xMidYMid meet"></svg>
+    </div>
+    <div class="infoCard" id="infoCard">
+      <button class="closeCard" id="closeCard">✕</button>
+      <div class="pline" id="icLine"></div>
+      <div class="ploc" id="icLoc"></div>
+      <div class="pmeta" id="icMeta"></div>
+      <div class="pnote" id="icNote"></div>
+      <div class="pacts">
+        <button class="pbtn" id="icConfirm">Toujours là</button>
+        <button class="pbtn left" id="icLeft">Parti</button>
+      </div>
+      <button class="pdel" id="icDel" style="display:none;">Supprimer mon signalement</button>
+    </div>
+  </div>
+
+  <div class="view" id="viewList"><div class="board" id="boardList"></div></div>
+  <div class="view" id="viewMine"><div class="board" id="boardMine"></div></div>
+
+  <div class="disclaimer">Appli communautaire non officielle. Signalements anonymes fournis par les utilisateurs, exactitude non garantie. Un titre de transport valide reste obligatoire.</div>
+
+  <button class="fab" id="fabBtn" aria-label="Signaler un contrôle">+</button>
+
+  <div class="overlay" id="overlay"></div>
+  <div class="sheet" id="sheet">
+    <h2>SIGNALER</h2>
+    <div class="sub">Touchez la carte à l'endroit du contrôle, puis complétez.</div>
+
+    <div class="field">
+      <label>Localisation approximative</label>
+      <div id="pickMapWrap">
+        <svg id="pickSvg" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid meet"></svg>
+      </div>
+      <div class="pickHint" id="pickHint">Aucun point placé — touchez la carte</div>
+    </div>
+
+    <div class="field">
+      <label>Mode</label>
+      <div class="modechips">
+        <button class="modechip selected" data-mode="Bus">Bus</button>
+        <button class="modechip" data-mode="Tram">Tram</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Ligne</label>
+      <div class="chips" id="busChips">
+        <button class="chip">C1</button><button class="chip">C2</button><button class="chip">C3</button><button class="chip">C4</button>
+        <button class="chip">C5</button><button class="chip">C6</button><button class="chip">C7</button>
+        <button class="chip">Autre…</button>
+      </div>
+      <div class="chips" id="tramChips" style="display:none;">
+        <button class="chip">A</button><button class="chip">B</button><button class="chip">C</button>
+        <button class="chip">D</button><button class="chip">E</button><button class="chip">Autre…</button>
+      </div>
+    </div>
+
+    <div class="field" id="customLineField" style="display:none;">
+      <label>Précisez le numéro / nom de la ligne</label>
+      <input type="text" id="customLineInput" placeholder="ex : 51, Proximo, Flexo…">
+    </div>
+
+    <div class="field">
+      <label>Nom de l'arrêt / repère</label>
+      <div style="position:relative;">
+        <input type="text" id="locInput" autocomplete="off" placeholder="ex : Victor Hugo, direction Échirolles">
+        <div class="suggestBox" id="locSuggest"></div>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Note (facultatif)</label>
+      <input type="text" id="noteInput" placeholder="ex : 3 agents, contrôlent à la montée">
+    </div>
+
+    <button class="submitbtn" id="submitBtn" disabled>Envoyer le signalement</button>
+    <button class="cancelbtn" id="cancelBtn">Annuler</button>
+  </div>
+
+  <div class="overlay" id="profileOverlay"></div>
+  <div class="sheet" id="profileSheet">
+    <h2>PROFIL</h2>
+    <div class="sub">Local à cet appareil — pas de compte serveur, juste un pseudo pour reconnaître vos propres signalements.</div>
+    <div class="field">
+      <label>Pseudo</label>
+      <input type="text" id="nicknameInput" placeholder="ex : Alex_G">
+    </div>
+    <button class="submitbtn" id="saveProfileBtn" style="background:var(--led-amber); color:var(--board-black);">Enregistrer</button>
+    <button class="cancelbtn" id="closeProfileBtn">Fermer</button>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  const STORAGE_KEY = 'reports-board';
+  const FRESH_MIN = 10, AGING_MIN = 25, EXPIRE_MIN = 45, PRUNE_MIN = 180;
+
+  const ZONES = [
+    { name:'BASTILLE',      x:0.55, y:0.10 },
+    { name:'HYPER-CENTRE',  x:0.50, y:0.36 },
+    { name:'GARE',          x:0.30, y:0.55 },
+    { name:'EUROPOLE',      x:0.68, y:0.50 },
+    { name:'ÉCHIROLLES',    x:0.55, y:0.86 },
+    { name:'ÎLE VERTE',     x:0.22, y:0.22 }
+  ];
+
+  function buildNetworkSvg(svgEl, viewW, viewH){
+    svgEl.innerHTML = '';
+    const ns = 'http://www.w3.org/2000/svg';
+    const bg = document.createElementNS(ns,'rect');
+    bg.setAttribute('x',0); bg.setAttribute('y',0); bg.setAttribute('width',viewW); bg.setAttribute('height',viewH);
+    bg.setAttribute('fill','#10141f');
+    svgEl.appendChild(bg);
+
+    for(let x=0;x<=viewW;x+=40){
+      const l = document.createElementNS(ns,'line');
+      l.setAttribute('x1',x); l.setAttribute('y1',0); l.setAttribute('x2',x); l.setAttribute('y2',viewH);
+      l.setAttribute('stroke','rgba(255,255,255,0.045)'); l.setAttribute('stroke-width','1');
+      svgEl.appendChild(l);
+    }
+    for(let y=0;y<=viewH;y+=40){
+      const l = document.createElementNS(ns,'line');
+      l.setAttribute('x1',0); l.setAttribute('y1',y); l.setAttribute('x2',viewW); l.setAttribute('y2',y);
+      l.setAttribute('stroke','rgba(255,255,255,0.045)'); l.setAttribute('stroke-width','1');
+      svgEl.appendChild(l);
+    }
+
+    const river = document.createElementNS(ns,'path');
+    const ry = viewH * 0.16;
+    river.setAttribute('d', `M 0 ${ry} C ${viewW*0.3} ${ry - 30}, ${viewW*0.6} ${ry + 40}, ${viewW} ${ry}`);
+    river.setAttribute('fill','none');
+    river.setAttribute('stroke','#2f6690');
+    river.setAttribute('stroke-width','10');
+    river.setAttribute('opacity','0.5');
+    river.setAttribute('stroke-linecap','round');
+    svgEl.appendChild(river);
+
+    if(viewH > 400){
+      ZONES.forEach(z=>{
+        const cx = z.x * viewW, cy = z.y * viewH;
+        const dot = document.createElementNS(ns,'circle');
+        dot.setAttribute('cx',cx); dot.setAttribute('cy',cy); dot.setAttribute('r','3');
+        dot.setAttribute('fill','rgba(232,163,61,0.4)');
+        svgEl.appendChild(dot);
+        const label = document.createElementNS(ns,'text');
+        label.setAttribute('x',cx); label.setAttribute('y', cy - 10);
+        label.setAttribute('fill','rgba(232,163,61,0.45)');
+        label.setAttribute('font-size','10'); label.setAttribute('font-family','monospace');
+        label.setAttribute('text-anchor','middle');
+        label.textContent = z.name;
+        svgEl.appendChild(label);
+      });
+    }
+  }
+
+  const STOP_NAMES = [
+  { name: "Victor Hugo", x: 0.5115, y: 0.4583 },
+  { name: "Victor Hugo - Belgrade", x: 0.5248, y: 0.4383 },
+  { name: "Verdun - Préfecture", x: 0.5633, y: 0.46 },
+  { name: "Chavant", x: 0.5653, y: 0.487 },
+  { name: "Hubert Dubedout - Maison du Tourisme", x: 0.5434, y: 0.446 },
+  { name: "Notre-Dame - Musée", x: 0.5676, y: 0.421 },
+  { name: "Sainte-Claire - Les Halles", x: 0.5585, y: 0.4366 },
+  { name: "Alsace-Lorraine", x: 0.4885, y: 0.454 },
+  { name: "Saint-Bruno", x: 0.4528, y: 0.4598 },
+  { name: "Condorcet", x: 0.4819, y: 0.4805 },
+  { name: "Vallier - Catane", x: 0.4039, y: 0.5213 },
+  { name: "Vallier - Libération", x: 0.4686, y: 0.5205 },
+  { name: "Ile Verte", x: 0.5991, y: 0.3917 },
+  { name: "Mutualité", x: 0.5953, y: 0.444 },
+  { name: "Saint-Roch", x: 0.6069, y: 0.4379 },
+  { name: "Esclangon", x: 0.4096, y: 0.4358 },
+  { name: "Palais de Justice - Gare", x: 0.4365, y: 0.4353 },
+  { name: "Docteur Martin", x: 0.5377, y: 0.4674 },
+  { name: "Docteur Mazet", x: 0.5052, y: 0.438 },
+  { name: "Caserne de Bonne", x: 0.5256, y: 0.484 },
+  { name: "Championnet", x: 0.5124, y: 0.4805 },
+  { name: "Bir Hakeim", x: 0.5938, y: 0.4559 },
+  { name: "La Bruyère", x: 0.5458, y: 0.6229 },
+  { name: "La Bruyère - Parc Jean Verlhac", x: 0.5617, y: 0.6225 },
+  { name: "Cité Jean Macé", x: 0.4342, y: 0.3737 },
+  { name: "Marielle Franco - Technisud", x: 0.429, y: 0.6642 },
+  { name: "Anatole France", x: 0.4, y: 0.5817 },
+  { name: "Salengro", x: 0.4242, y: 0.5536 },
+  { name: "Beauvert", x: 0.48, y: 0.6386 },
+  { name: "Louise Michel", x: 0.4489, y: 0.5973 },
+  { name: "Malherbe", x: 0.5685, y: 0.6008 },
+  { name: "Vigny", x: 0.5136, y: 0.6144 },
+  { name: "Reynoard", x: 0.546, y: 0.64 },
+  { name: "D\u2019Alembert", x: 0.4351, y: 0.4902 },
+  { name: "Henri Dunant", x: 0.4207, y: 0.5628 },
+  { name: "Docteur Schweitzer", x: 0.4085, y: 0.5773 },
+  { name: "Eugène Sue", x: 0.5221, y: 0.5745 },
+  { name: "Stalingrad-Alliés", x: 0.5196, y: 0.5827 },
+  { name: "Alliés", x: 0.4575, y: 0.566 },
+  { name: "Gustave Rivet Provisoire", x: 0.5265, y: 0.5114 },
+  { name: "Teisseire", x: 0.617, y: 0.5895 },
+  { name: "Louis Jouvet", x: 0.5983, y: 0.5955 },
+  { name: "Village Olympique", x: 0.5177, y: 0.6391 },
+  { name: "Clemenceau", x: 0.6226, y: 0.4927 },
+  { name: "Saint-Laurent", x: 0.5703, y: 0.3881 },
+  { name: "Cémoi", x: 0.4049, y: 0.4848 },
+  { name: "Capuche", x: 0.526, y: 0.55 },
+  { name: "Bachelard", x: 0.4061, y: 0.6191 },
+  { name: "Le Mail", x: 0.5477, y: 0.6604 },
+  { name: "Les Géants", x: 0.6157, y: 0.661 },
+  { name: "Les Essarts", x: 0.4543, y: 0.6747 },
+  { name: "Rondeau", x: 0.4055, y: 0.679 },
+  { name: "Grand Sablon", x: 0.6777, y: 0.3806 },
+  { name: "Doyen Gosse", x: 0.6963, y: 0.3632 },
+  { name: "Hôpital - Neuroscience", x: 0.6401, y: 0.3858 },
+  { name: "Hôpital Michallon - Grésivaudan", x: 0.6489, y: 0.3714 },
+  { name: "Hôpital Michallon - Belledonne", x: 0.6628, y: 0.3946 },
+  { name: "Saint-Germain", x: 0.6412, y: 0.2983 },
+  { name: "Pascal", x: 0.7101, y: 0.3771 },
+  { name: "Sablons", x: 0.6904, y: 0.3996 },
+  { name: "Musée Hébert", x: 0.6708, y: 0.3317 },
+  { name: "Grande Tronche", x: 0.6517, y: 0.3213 },
+  { name: "Échirolles Centre", x: 0.4834, y: 0.7211 },
+  { name: "Echirolles Gare", x: 0.4834, y: 0.7211 },
+  { name: "Hôpital Sud", x: 0.5713, y: 0.7664 },
+  { name: "Musée Géo Charles", x: 0.3801, y: 0.7525 },
+  { name: "Denis Papin", x: 0.4501, y: 0.8299 },
+  { name: "Marie Curie", x: 0.4745, y: 0.7788 },
+  { name: "Paul Langevin", x: 0.5121, y: 0.7919 },
+  { name: "Le Château", x: 0.5341, y: 0.7633 },
+  { name: "Vassieux", x: 0.3697, y: 0.7951 },
+  { name: "Grugliasco", x: 0.4278, y: 0.7341 },
+  { name: "Guy Mocquet", x: 0.5288, y: 0.777 },
+  { name: "Les Glières", x: 0.4415, y: 0.7463 },
+  { name: "Bayard", x: 0.399, y: 0.7738 },
+  { name: "Fontaine Hôtel de Ville - La Source", x: 0.2911, y: 0.4375 },
+  { name: "Fontaine Zola", x: 0.2638, y: 0.3797 },
+  { name: "La Poya", x: 0.1983, y: 0.395 },
+  { name: "Louis Maisonnat", x: 0.3331, y: 0.454 },
+  { name: "Jean Prévost", x: 0.2633, y: 0.4508 },
+  { name: "Karl Marx", x: 0.2912, y: 0.4732 },
+  { name: "Curie - Vercors", x: 0.339, y: 0.4335 },
+  { name: "Gérard Philipe", x: 0.2297, y: 0.3981 },
+  { name: "Les Écrins", x: 0.2852, y: 0.3917 },
+  { name: "Rue des Alpes", x: 0.2517, y: 0.3883 },
+  { name: "Grand Pré", x: 0.334, y: 0.5823 },
+  { name: "Bouchayer - Hôtel de Ville", x: 0.3348, y: 0.5158 },
+  { name: "Beau Site", x: 0.3508, y: 0.5517 },
+  { name: "Fauconnière", x: 0.3327, y: 0.5449 },
+  { name: "Bergès - Vercors", x: 0.3123, y: 0.4906 },
+  { name: "Aristide Bergès", x: 0.3366, y: 0.4807 },
+  { name: "Les Iles", x: 0.352, y: 0.4911 },
+  { name: "Louis Vicat", x: 0.3309, y: 0.6669 },
+  { name: "Seyssins Village", x: 0.2549, y: 0.6961 },
+  { name: "Beauvoir", x: 0.2663, y: 0.677 },
+  { name: "Université - Bibliothèques", x: 0.8065, y: 0.4292 },
+  { name: "Gières Gare - Université", x: 0.8908, y: 0.4824 },
+  { name: "Gières Gare - Chamandier", x: 0.895, y: 0.4851 },
+  { name: "Plaine des Sports", x: 0.8885, y: 0.4619 },
+  { name: "Place de la République", x: 0.94, y: 0.506 },
+  { name: "Épicéa", x: 0.8306, y: 0.4107 },
+  { name: "Mayencin - Champ Roman", x: 0.8561, y: 0.4851 },
+  { name: "Zella Mehlis", x: 0.6995, y: 0.6172 },
+  { name: "Anguisses", x: 0.8494, y: 0.5376 },
+  { name: "Université - Les Taillées", x: 0.729, y: 0.4349 },
+  { name: "Université - Condillac", x: 0.8283, y: 0.4537 },
+  { name: "Grand Châtelet", x: 0.6679, y: 0.5071 },
+  { name: "Champ Roman", x: 0.7901, y: 0.489 },
+  { name: "Croix Rouge", x: 0.6647, y: 0.4802 },
+  { name: "Paul Eluard", x: 0.6707, y: 0.6316 },
+  { name: "Rocheplane", x: 0.7538, y: 0.534 },
+  { name: "Neyrpic - Belledonne", x: 0.7218, y: 0.4719 },
+  { name: "Chopin", x: 0.6864, y: 0.6247 },
+  { name: "Ancienne Mairie", x: 0.8584, y: 0.2407 },
+  { name: "Meylan Centre", x: 0.8584, y: 0.2407 },
+  { name: "Buclos", x: 0.8125, y: 0.3277 },
+  { name: "Les Béalières", x: 0.9285, y: 0.2881 },
+  { name: "Chaumetière", x: 0.8047, y: 0.2814 },
+  { name: "Plaine Fleurie", x: 0.7479, y: 0.353 },
+  { name: "Haut-Meylan", x: 0.8572, y: 0.2404 },
+  { name: "Corenc Village", x: 0.7534, y: 0.2267 },
+  { name: "Croix de Montfleury", x: 0.6736, y: 0.3084 },
+  { name: "Montfleury", x: 0.7214, y: 0.2843 },
+  { name: "Mairie-Condamine", x: 0.6833, y: 0.2907 },
+  { name: "La Garenne", x: 0.7752, y: 0.1715 },
+  { name: "Le Pont-de-Claix Mairie", x: 0.3557, y: 0.94 },
+  { name: "Iles de Mars", x: 0.3711, y: 0.8769 },
+  { name: "Irène Joliot-Curie", x: 0.3607, y: 0.9106 },
+  { name: "Gendarmerie", x: 0.3604, y: 0.8173 },
+  { name: "120 Toises", x: 0.3385, y: 0.8453 },
+  { name: "Saint-Égrève Gare", x: 0.1947, y: 0.109 },
+  { name: "Cap des H\u2019", x: 0.2541, y: 0.2453 },
+  { name: "Karben", x: 0.1904, y: 0.06 },
+  { name: "Fiancey - Prédieu", x: 0.2973, y: 0.1988 },
+  { name: "Vieux donjon", x: 0.06, y: 0.2892 },
+  { name: "Château de Sassenage", x: 0.1333, y: 0.2828 },
+  { name: "Complexe Sportif", x: 0.2014, y: 0.2889 },
+  { name: "Eybens Mairie", x: 0.6764, y: 0.7633 },
+  { name: "L\u2019Iliade", x: 0.6497, y: 0.7647 },
+  { name: "Le Bourg", x: 0.6848, y: 0.7597 },
+  { name: "Général de Gaulle", x: 0.6436, y: 0.6574 },
+  { name: "Hôtel de Police", x: 0.5896, y: 0.4171 },
+  { name: "Stade des Alpes", x: 0.5011, y: 0.6373 },
+  ];
+
+  function badgeContent(line){
+    return '<span style="font-size:13px;line-height:1;">👮</span><span style="display:block;line-height:1.05;margin-top:1px;">' + escapeHtml(line) + '</span>';
+  }
+
+  const SUPABASE_URL = 'https://ogqbyjqapgbjmppnzyfm.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ncWJ5anFhcGdiam1wcG56eWZtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY4ODc5MDksImV4cCI6MjEwMjQ2MzkwOX0.4j7zt1HXrjUmfcRwyNgZHliTP3KXSDttaif30Hy9thA';
+  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  const GEO_BOUNDS = { lonMin:5.64977, lonMax:5.79257, latMin:45.12345, latMax:45.24235, pad:0.06 };
+  function xyToLatLng(x, y){
+    const { lonMin, lonMax, latMin, latMax, pad } = GEO_BOUNDS;
+    return {
+      lon: lonMin + (lonMax-lonMin) * (x-pad)/(1-2*pad),
+      lat: latMax - (latMax-latMin) * (y-pad)/(1-2*pad)
+    };
+  }
+  function latLngToXY(lat, lon){
+    const { lonMin, lonMax, latMin, latMax, pad } = GEO_BOUNDS;
+    const x = pad + (1-2*pad) * (lon-lonMin)/(lonMax-lonMin);
+    const y = pad + (1-2*pad) * (latMax-lat)/(latMax-latMin);
+    return { x: Math.min(0.98,Math.max(0.02,x)), y: Math.min(0.98,Math.max(0.02,y)) };
+  }
+  let reports = [];
+  let myReports = [];
+  let selectedMode = 'Bus';
+  let selectedLine = null;
+  let pickedPoint = null;
+  let profile = { id: null, nickname: '' };
+  let votedThisSession = new Set();
+  let activeCardId = null;
+
+  function mapDbRow(row){
+    const xy = latLngToXY(row.latitude, row.longitude);
+    return {
+      id: row.id, mode: row.transport_type, line: row.line, location: row.location_name,
+      note: row.note || '', mapX: xy.x, mapY: xy.y,
+      timestamp: new Date(row.created_at).getTime(),
+      stillHereCount: row.still_here_count, leftCount: row.left_count,
+      reporterId: row.user_id || null
+    };
+  }
+
+  const el = id => document.getElementById(id);
+  const toast = el('toast');
+  function showToast(msg){ toast.textContent = msg; toast.classList.add('show'); setTimeout(()=>toast.classList.remove('show'), 1800); }
+  function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  function ageMinutes(r){ return (Date.now() - r.timestamp) / 60000; }
+  function freshClass(age){ if(age < FRESH_MIN) return 'fresh'; if(age < AGING_MIN) return 'aging'; return 'stale'; }
+  function fmtAge(age){ if(age < 1) return "à l'instant"; return 'il y a ' + Math.floor(age) + ' min'; }
+  function fmtDateTime(ts){
+    const d = new Date(ts);
+    const dateStr = d.toLocaleDateString('fr-FR', {day:'2-digit', month:'2-digit'});
+    const timeStr = d.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
+    return dateStr + ' à ' + timeStr;
+  }
+  function isVisible(r){
+    const age = ageMinutes(r);
+    if(age >= EXPIRE_MIN) return false;
+    if(r.leftCount >= 10) return false;
+    return true;
+  }
+
+  buildNetworkSvg(el('mainSvg'), 400, 620);
+  buildNetworkSvg(el('pickSvg'), 400, 300);
+
+  async function initProfile(){
+    let { data: { session } } = await supabase.auth.getSession();
+    if(!session){
+      const { data, error } = await supabase.auth.signInAnonymously();
+      if(error){ console.error('Anonymous sign-in failed', error); showToast('Erreur de connexion'); return; }
+      session = data.session;
+    }
+    profile.id = session.user.id;
+    const { data: profRow, error: profErr } = await supabase
+      .from('profiles').select('nickname').eq('id', profile.id).single();
+    if(profErr) console.error('profile fetch failed', profErr);
+    profile.nickname = (profRow && profRow.nickname) || '';
+    el('profileBtn').textContent = profile.nickname ? profile.nickname.slice(0,2).toUpperCase() : '?';
+  }
+
+  el('profileBtn').addEventListener('click', ()=>{
+    el('nicknameInput').value = profile.nickname || '';
+    el('profileOverlay').classList.add('show'); el('profileSheet').classList.add('show');
+  });
+  el('closeProfileBtn').addEventListener('click', closeProfileSheet);
+  el('profileOverlay').addEventListener('click', closeProfileSheet);
+  function closeProfileSheet(){ el('profileOverlay').classList.remove('show'); el('profileSheet').classList.remove('show'); }
+  el('saveProfileBtn').addEventListener('click', async ()=>{
+    const nickname = el('nicknameInput').value.trim();
+    const { error } = await supabase.from('profiles').update({ nickname }).eq('id', profile.id);
+    if(error){ console.error(error); showToast("Erreur d'enregistrement"); return; }
+    profile.nickname = nickname;
+    el('profileBtn').textContent = profile.nickname ? profile.nickname.slice(0,2).toUpperCase() : '?';
+    showToast('Profil enregistré');
+    closeProfileSheet();
+    renderAll();
+  });
+
+  document.querySelectorAll('.tab').forEach(tab=>{
+    tab.addEventListener('click', ()=>{
+      document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+      tab.classList.add('active');
+      document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+      el('view' + tab.dataset.view.charAt(0).toUpperCase() + tab.dataset.view.slice(1)).classList.add('active');
+    });
+  });
+
+  const mainMapWrap = el('mainMapWrap');
+  let mainMarkersLayer = [];
+
+  function clearMainMarkers(){ mainMarkersLayer.forEach(m=>m.remove()); mainMarkersLayer = []; }
+
+  function renderMainMarkers(visible){
+    clearMainMarkers();
+    visible.forEach(r=>{
+      if(typeof r.mapX !== 'number') return;
+      const age = ageMinutes(r);
+      const cls = freshClass(age);
+      const m = document.createElement('div');
+      m.className = 'marker ' + cls;
+      m.style.left = (r.mapX*100) + '%';
+      m.style.top = (r.mapY*100) + '%';
+      m.innerHTML = badgeContent(r.line);
+      m.addEventListener('click', ()=> openInfoCard(r.id));
+      mainMapWrap.appendChild(m);
+      mainMarkersLayer.push(m);
+    });
+  }
+
+  function openInfoCard(id){
+    const r = reports.find(x=>x.id===id);
+    if(!r) return;
+    activeCardId = id;
+    const age = ageMinutes(r);
+    el('icLine').textContent = r.mode + ' ' + r.line;
+    el('icLoc').textContent = r.location;
+    el('icMeta').textContent = fmtAge(age) + ' · ' + fmtDateTime(r.timestamp) + (r.stillHereCount ? ' · ✓' + r.stillHereCount + ' confirmé(s)' : '');
+    el('icNote').textContent = r.note || '';
+    el('icNote').style.display = r.note ? 'block' : 'none';
+    el('icConfirm').disabled = votedThisSession.has(id+':confirm');
+    el('icLeft').disabled = votedThisSession.has(id+':left');
+    el('icDel').style.display = 'none';
+    el('infoCard').classList.add('show');
+  }
+  function closeInfoCard(){ el('infoCard').classList.remove('show'); activeCardId = null; }
+  el('closeCard').addEventListener('click', closeInfoCard);
+  el('icConfirm').addEventListener('click', ()=>{ if(activeCardId) castVote(activeCardId,'confirm'); });
+  el('icLeft').addEventListener('click', ()=>{ if(activeCardId) castVote(activeCardId,'left'); });
+
+  const pickMapWrap = el('pickMapWrap');
+  let pickPinEl = null;
+  function placePickPin(point, viaSuggestion){
+    if(pickPinEl) pickPinEl.remove();
+    pickPinEl = document.createElement('div');
+    pickPinEl.className = 'pickPin';
+    pickPinEl.innerHTML = `<svg viewBox="0 0 24 24" width="26" height="26"><path fill="#e8a33d" d="M12 0C7 0 3 4 3 9c0 6.5 9 15 9 15s9-8.5 9-15c0-5-4-9-9-9z"/><circle cx="12" cy="9" r="3.2" fill="#10141f"/></svg>`;
+    pickPinEl.style.left = (point.x*100) + '%';
+    pickPinEl.style.top = (point.y*100) + '%';
+    pickMapWrap.appendChild(pickPinEl);
+    el('pickHint').textContent = viaSuggestion
+      ? 'Point placé automatiquement d\u2019après l\u2019arrêt choisi ✓ — touchez la carte pour ajuster'
+      : 'Point placé ✓ — touchez à nouveau pour ajuster';
+  }
+  function ensurePickMapReady(){}
+  pickMapWrap.addEventListener('click', (e)=>{
+    const rect = pickMapWrap.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / rect.width;
+    const y = (e.clientY - rect.top) / rect.height;
+    pickedPoint = { x: Math.min(0.98,Math.max(0.02,x)), y: Math.min(0.98,Math.max(0.02,y)) };
+    placePickPin(pickedPoint, false);
+    validateForm();
+  });
+
+  function openSheet(){ el('overlay').classList.add('show'); el('sheet').classList.add('show'); }
+  function closeSheet(){
+    el('overlay').classList.remove('show'); el('sheet').classList.remove('show');
+    selectedLine = null; pickedPoint = null;
+    el('locInput').value=''; el('noteInput').value='';
+    document.querySelectorAll('.chip.selected').forEach(c=>c.classList.remove('selected'));
+    el('pickHint').textContent = 'Aucun point placé — touchez la carte';
+    el('locSuggest').classList.remove('show'); el('locSuggest').innerHTML='';
+    el('customLineField').style.display = 'none'; el('customLineInput').value = '';
+    if(pickPinEl){ pickPinEl.remove(); pickPinEl=null; }
+    validateForm();
+  }
+  el('fabBtn').addEventListener('click', openSheet);
+  el('overlay').addEventListener('click', closeSheet);
+  el('cancelBtn').addEventListener('click', closeSheet);
+
+  document.querySelectorAll('.modechip').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      document.querySelectorAll('.modechip').forEach(b=>b.classList.remove('selected'));
+      btn.classList.add('selected');
+      selectedMode = btn.dataset.mode;
+      el('busChips').style.display = selectedMode==='Bus' ? 'flex' : 'none';
+      el('tramChips').style.display = selectedMode==='Tram' ? 'flex' : 'none';
+      selectedLine = null;
+      document.querySelectorAll('.chip.selected').forEach(c=>c.classList.remove('selected'));
+      el('customLineField').style.display = 'none';
+      el('customLineInput').value = '';
+      validateForm();
+    });
+  });
+  [el('busChips'), el('tramChips')].forEach(container=>{
+    container.addEventListener('click', (e)=>{
+      const chip = e.target.closest('.chip');
+      if(!chip) return;
+      container.querySelectorAll('.chip').forEach(c=>c.classList.remove('selected'));
+      chip.classList.add('selected');
+      if(chip.textContent === 'Autre…'){
+        selectedLine = '';
+        el('customLineField').style.display = 'block';
+        el('customLineInput').value = '';
+        el('customLineInput').focus();
+      }else{
+        selectedLine = chip.textContent;
+        el('customLineField').style.display = 'none';
+        el('customLineInput').value = '';
+      }
+      validateForm();
+    });
+  });
+  el('customLineInput').addEventListener('input', ()=>{
+    selectedLine = el('customLineInput').value.trim();
+    validateForm();
+  });
+  function validateForm(){
+    el('submitBtn').disabled = !(selectedLine && selectedLine.length && el('locInput').value.trim().length && pickedPoint);
+  }
+  function updateSuggestions(){
+    const q = el('locInput').value.trim().toLowerCase();
+    const box = el('locSuggest');
+    if(q.length < 2){ box.classList.remove('show'); box.innerHTML=''; return; }
+    const matches = STOP_NAMES.filter(s=>s.name.toLowerCase().includes(q)).slice(0,6);
+    if(!matches.length){ box.classList.remove('show'); box.innerHTML=''; return; }
+    box.innerHTML = matches.map(s=>{
+      const idx = s.name.toLowerCase().indexOf(q);
+      const before = s.name.slice(0,idx), mid = s.name.slice(idx,idx+q.length), after = s.name.slice(idx+q.length);
+      return '<div class="suggestItem" data-name="'+escapeHtml(s.name)+'" data-x="'+s.x+'" data-y="'+s.y+'">'+escapeHtml(before)+'<b>'+escapeHtml(mid)+'</b>'+escapeHtml(after)+'</div>';
+    }).join('');
+    box.classList.add('show');
+  }
+  el('locInput').addEventListener('input', ()=>{ validateForm(); updateSuggestions(); });
+  el('locSuggest').addEventListener('click', (e)=>{
+    const item = e.target.closest('.suggestItem');
+    if(!item) return;
+    el('locInput').value = item.dataset.name;
+    el('locSuggest').classList.remove('show'); el('locSuggest').innerHTML='';
+    ensurePickMapReady();
+    pickedPoint = { x: parseFloat(item.dataset.x), y: parseFloat(item.dataset.y) };
+    placePickPin(pickedPoint, true);
+    validateForm();
+  });
+  document.addEventListener('click', (e)=>{
+    if(!e.target.closest('#locInput') && !e.target.closest('#locSuggest')){
+      el('locSuggest').classList.remove('show');
+    }
+  });
+
+  el('submitBtn').addEventListener('click', async ()=>{
+    if(el('submitBtn').disabled) return;
+    el('submitBtn').disabled = true;
+    const { lat, lon } = xyToLatLng(pickedPoint.x, pickedPoint.y);
+    const { error } = await supabase.from('reports').insert({
+      user_id: profile.id,
+      latitude: lat,
+      longitude: lon,
+      transport_type: selectedMode,
+      line: selectedLine,
+      location_name: el('locInput').value.trim(),
+      note: el('noteInput').value.trim() || null
+    });
+    if(error){
+      console.error(error);
+      if(error.message && error.message.includes('COOLDOWN_ACTIVE')) showToast('Attendez un peu avant un nouveau signalement');
+      else if(error.message && error.message.includes('DAILY_LIMIT_REACHED')) showToast('Limite quotidienne de signalements atteinte');
+      else showToast("Erreur d'envoi, réessayez");
+      el('submitBtn').disabled = false;
+      return;
+    }
+    await refresh();
+    closeSheet();
+    showToast('Signalement envoyé ✓');
+  });
+
+  async function loadReports(){
+    const { data, error } = await supabase
+      .from('reports_public').select('*').order('created_at', { ascending:false });
+    if(error){ console.error('loadReports failed, keeping existing data', error); return; }
+    reports = (data || []).map(mapDbRow);
+  }
+  async function loadMyReports(){
+    const { data, error } = await supabase
+      .from('reports').select('*').eq('user_id', profile.id).order('created_at', { ascending:false });
+    if(error){ console.error('loadMyReports failed', error); return; }
+    myReports = (data || []).map(mapDbRow);
+  }
+
+  async function castVote(id, act){
+    const key = id + ':' + act;
+    if(votedThisSession.has(key)){ showToast('Déjà pris en compte'); return; }
+    const { error } = await supabase.from('report_confirmations')
+      .insert({ report_id: id, user_id: profile.id, action: act });
+    if(error){
+      if(error.code === '23505'){ votedThisSession.add(key); showToast('Déjà pris en compte'); }
+      else { console.error(error); showToast('Erreur, réessayez'); }
+      return;
+    }
+    votedThisSession.add(key);
+    showToast(act==='confirm' ? 'Merci, confirmé ✓' : 'Merci, on note le départ');
+    await refresh();
+    if(activeCardId === id) openInfoCard(id);
+  }
+
+  function renderAll(){
+    const visible = reports.filter(isVisible).sort((a,b)=>b.timestamp - a.timestamp);
+    el('statActive').textContent = visible.length;
+    el('statFresh').textContent = visible.filter(r=>ageMinutes(r) < FRESH_MIN).length;
+
+    renderMainMarkers(visible);
+    renderList(visible, el('boardList'), false);
+    renderList(myReports.slice().sort((a,b)=>b.timestamp-a.timestamp), el('boardMine'), true);
+
+    if(activeCardId && !visible.find(r=>r.id===activeCardId)) closeInfoCard();
+  }
+
+  function renderList(list, container, mineMode){
+    container.querySelectorAll('.row, .empty').forEach(n=>n.remove());
+    if(!list.length){
+      const empty = document.createElement('div');
+      empty.className = 'empty';
+      empty.innerHTML = mineMode
+        ? '<span class="glyph">◌</span>Vous n\u2019avez pas encore de signalement.'
+        : '<span class="glyph">◌</span>Aucun contrôle signalé pour le moment.<br>Soyez le premier à prévenir le réseau.';
+      container.appendChild(empty);
+      return;
+    }
+    list.forEach(r=>{
+      const age = ageMinutes(r);
+      const cls = freshClass(age);
+      const pct = Math.max(4, 100 - (age/EXPIRE_MIN)*100);
+      const gone = !isVisible(r);
+      const canVoteConfirm = !votedThisSession.has(r.id+':confirm');
+      const canVoteLeft = !votedThisSession.has(r.id+':left');
+      const row = document.createElement('div');
+      row.className = 'row';
+      row.style.opacity = gone ? 0.45 : 1;
+      row.innerHTML = `
+        <div class="badge ${cls}">${badgeContent(r.line)}</div>
+        <div class="info">
+          <div class="loc">${escapeHtml(r.location)}</div>
+          <div class="meta"><span>${r.mode}</span><span>${fmtAge(age)}</span><span>${fmtDateTime(r.timestamp)}</span>${r.stillHereCount ? `<span>✓ ${r.stillHereCount}</span>` : ''}${gone?'<span>(marqué parti)</span>':''}</div>
+          ${r.note ? `<div class="note">${escapeHtml(r.note)}</div>` : ''}
+        </div>
+        <div class="actions">
+          ${mineMode
+            ? `<span style="font-size:10px; color:var(--text-grey);">${r.stillHereCount||0} confirmation(s)</span>`
+            : `<button class="actbtn" data-id="${r.id}" data-act="confirm" ${canVoteConfirm?'':'disabled'} style="${canVoteConfirm?'':'opacity:.35'}">Toujours là</button>
+               <button class="actbtn left" data-id="${r.id}" data-act="left" ${canVoteLeft?'':'disabled'} style="${canVoteLeft?'':'opacity:.35'}">Parti</button>`}
+        </div>
+        <div class="freshbar"><div style="width:${pct}%"></div></div>
+      `;
+      container.appendChild(row);
+    });
+  }
+
+  document.addEventListener('click', (e)=>{
+    const btn = e.target.closest('.actbtn[data-id]');
+    if(btn && !btn.disabled){ castVote(btn.dataset.id, btn.dataset.act); return; }
+  });
+
+  async function refresh(){ await loadReports(); await loadMyReports(); renderAll(); }
+  (async ()=>{
+    await initProfile();
+    await refresh();
+    setInterval(refresh, 8000);
+    setInterval(renderAll, 30000);
+  })();
+})();
+</script>
+</body>
+</html>
