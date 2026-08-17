@@ -4,6 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Alerte contrôleur BUS 👮 · Réseau Grenoble</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0d1017">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Alerte Contrôleur">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
@@ -25,8 +32,14 @@
     --line-a:#e8432b; --line-b:#c98a2e; --line-c:#4fbf82; --line-d:#9b6fe0; --line-e:#4fa3d1;
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
-  html,body{margin:0;padding:0;background:var(--board-black);color:var(--led-amber);font-family:var(--font-ui);height:100%;}
-  body{display:flex; flex-direction:column; height:100vh; overflow:hidden;
+  html{height:100%; overflow:hidden;}
+  html,body{margin:0;padding:0;background:var(--board-black);color:var(--led-amber);font-family:var(--font-ui);
+    overscroll-behavior-y:none; /* stop the whole page rubber-banding/being "stuck" on iOS/Android */
+  }
+  body{
+    display:flex; flex-direction:column;
+    height:100vh; height:100dvh; /* 100dvh accounts for the mobile browser's address bar so nothing gets clipped */
+    overflow:hidden; /* the app shell itself doesn't scroll — each .view scrolls internally, see below */
     background:
       radial-gradient(circle at 15% 0%, rgba(232,163,61,0.06), transparent 45%),
       radial-gradient(circle at 100% 100%, rgba(79,163,209,0.05), transparent 40%),
@@ -44,23 +57,43 @@
   .brand{font-family:var(--font-mono); font-weight:700; font-size:16.5px; letter-spacing:1.2px; text-shadow:0 0 10px var(--led-amber-glow);}
   .brand small{display:block; font-family:var(--font-ui); font-weight:400; letter-spacing:0.5px; font-size:10.5px; color:var(--text-grey); text-shadow:none; margin-top:3px;}
   .profileBtn{width:32px; height:32px; border-radius:50%; border:1.5px solid var(--led-amber-dim); background:var(--board-panel-2); color:var(--led-amber); font-family:var(--font-mono); font-weight:700; font-size:12px; display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,0.3);}
+  .headerBtns{display:flex; align-items:center; gap:8px;}
+  .iconBtn{width:32px; height:32px; border-radius:50%; border:1.5px solid var(--hairline); background:var(--board-panel-2); color:var(--text-grey); font-family:var(--font-mono); font-weight:700; font-size:10.5px; display:flex; align-items:center; justify-content:center; cursor:pointer;}
+  .iconBtn.on{color:#1a1206; background:var(--led-amber); border-color:var(--led-amber);}
+  .filterBar{display:flex; align-items:center; gap:7px; padding:10px 12px 0; flex-shrink:0; overflow-x:auto; -webkit-overflow-scrolling:touch;}
+  .fchip{flex-shrink:0; font-family:var(--font-mono); font-size:11.5px; font-weight:700; border:1.5px solid var(--hairline); color:var(--text-grey); background:var(--board-panel); border-radius:20px; padding:6px 12px; cursor:pointer;}
+  .fchip.active{color:#1a1206; background:var(--led-amber); border-color:var(--led-amber);}
+  .lineSelect{margin-left:auto; flex-shrink:0; background:var(--board-panel); border:1.5px solid var(--hairline); color:var(--led-amber); border-radius:8px; padding:6px 8px; font-size:11.5px; font-family:var(--font-mono); max-width:120px;}
+  .shareBtn{background:none; border:none; color:var(--text-grey); cursor:pointer; padding:4px; display:flex; align-items:center; justify-content:center;}
   .tabs{display:flex; gap:6px; margin-top:14px;}
   .tab{flex:1; text-align:center; padding:9px; border-radius:8px; border:1px solid var(--hairline); background:var(--board-black); color:var(--text-grey); font-size:12.5px; font-weight:600; cursor:pointer; font-family:var(--font-ui); transition:all .15s;}
   .tab.active{background:var(--led-amber); color:#1a1206; border-color:var(--led-amber); box-shadow:0 3px 12px rgba(232,163,61,0.3);}
   .stat-row{display:flex; gap:16px; margin-top:12px; font-family:var(--font-mono); font-size:11px; color:var(--text-grey);}
   .stat-row b{color:var(--led-amber); font-size:13px;}
 
-  .view{flex:1; min-height:0; display:none; position:relative;}
-  .view.active{display:block;}
+  .view{flex:1; min-height:0; display:none; position:relative; overflow:hidden;}
+  .view.active{display:flex; flex-direction:column;}
 
   /* ---- real map (Leaflet) ---- */
-  .mapWrap{width:100%; height:100%; position:relative; overflow:hidden; background:#10141f;}
+  .mapWrap{width:100%; height:100%; flex:1; min-height:0; position:relative; overflow:hidden; background:#10141f; touch-action:none;}
   #mainMapEl, #pickMapEl{width:100%; height:100%; background:#10141f;}
   .leaflet-container{background:#10141f; font-family:var(--font-ui);}
   .leaflet-control-attribution{background:rgba(22,27,38,0.85) !important; color:var(--text-grey) !important; font-size:9px !important;}
   .leaflet-control-attribution a{color:var(--text-grey) !important;}
   .leaflet-control-zoom a{background:var(--board-panel) !important; color:var(--led-amber) !important; border-color:var(--hairline) !important;}
   .mapHint{position:absolute; top:10px; left:50%; transform:translateX(-50%); background:rgba(22,27,38,0.92); border:1px solid var(--hairline); color:var(--text-grey); font-size:11px; padding:6px 12px; border-radius:20px; pointer-events:none; z-index:500; white-space:nowrap; box-shadow:0 4px 14px rgba(0,0,0,0.35);}
+  .locateBtn{position:absolute; left:10px; bottom:10px; z-index:900; width:42px; height:42px; border-radius:50%;
+    background:var(--board-panel); border:1.5px solid var(--hairline); color:var(--led-amber);
+    display:flex; align-items:center; justify-content:center; cursor:pointer;
+    box-shadow:0 4px 16px rgba(0,0,0,0.4); transition:transform .12s;}
+  .locateBtn:active{transform:scale(0.92);}
+  .locateBtn.busy svg{animation:locSpin 0.9s linear infinite;}
+  .locateBtn.active{color:#1a1206; background:var(--led-amber); border-color:var(--led-amber);}
+  @keyframes locSpin{from{transform:rotate(0deg);} to{transform:rotate(360deg);}}
+  .meDot{width:16px; height:16px; border-radius:50%; background:#4fa3d1; border:2.5px solid #fff;
+    box-shadow:0 0 0 4px rgba(79,163,209,0.35), 0 2px 6px rgba(0,0,0,0.4);}
+  @keyframes mePulse{0%{box-shadow:0 0 0 0 rgba(79,163,209,0.55);} 100%{box-shadow:0 0 0 16px rgba(79,163,209,0);}}
+  .meDot::after{content:''; position:absolute; inset:-4px; border-radius:50%; animation:mePulse 1.8s ease-out infinite;}
   .pinBadge{width:32px; height:36px; cursor:pointer;
     clip-path: polygon(50% 0%, 100% 22%, 100% 58%, 50% 100%, 0% 58%, 0% 22%);
     display:flex; flex-direction:column; align-items:center; justify-content:center; padding-bottom:5px; gap:1px;
@@ -88,7 +121,14 @@
   .infoCard .pdel{margin-top:7px; width:100%; font-size:11px; padding:8px; border-radius:7px; border:1px solid var(--signal-red); background:transparent; color:var(--signal-red); cursor:pointer;}
   .infoCard .closeCard{position:absolute; top:10px; right:12px; color:var(--text-grey); background:none; border:none; font-size:16px; cursor:pointer;}
 
-  .board{padding:12px; height:100%; overflow-y:auto;}
+  .board{
+    padding:12px; padding-bottom:calc(96px + env(safe-area-inset-bottom));
+    flex:1; min-height:0; width:100%;
+    overflow-y:auto; overflow-x:hidden;
+    -webkit-overflow-scrolling:touch; /* momentum scrolling on iOS */
+    overscroll-behavior-y:contain; /* keep the bounce inside the list, not the whole page */
+    touch-action:pan-y;
+  }
   .empty{margin-top:40px; text-align:center; color:var(--text-grey-dim); font-family:var(--font-mono); font-size:13px; line-height:1.8; padding:0 20px;}
   .empty .glyph{font-size:34px; display:block; margin-bottom:10px; opacity:.5;}
   .row{background:var(--board-panel); border:1px solid var(--hairline); border-radius:10px; padding:12px 12px 10px; display:grid; grid-template-columns:auto 1fr auto; gap:10px 12px; align-items:center; margin-bottom:10px; animation:rowIn .35s ease-out; box-shadow:0 3px 14px rgba(0,0,0,0.25);}
@@ -115,7 +155,7 @@
 
   .overlay{position:fixed; inset:0; background:rgba(6,8,12,0.7); z-index:2000; opacity:0; pointer-events:none; transition:opacity .2s;}
   .overlay.show{opacity:1; pointer-events:auto;}
-  .sheet{position:fixed; left:0; right:0; bottom:0; z-index:2001; background:var(--board-panel-2); border-top:1px solid var(--hairline); border-radius:18px 18px 0 0; padding:18px 16px calc(16px + env(safe-area-inset-bottom)); transform:translateY(105%); transition:transform .28s cubic-bezier(.32,.72,0,1); max-height:88vh; overflow-y:auto; box-shadow:0 -12px 40px rgba(0,0,0,0.5);}
+  .sheet{position:fixed; left:0; right:0; bottom:0; z-index:2001; background:var(--board-panel-2); border-top:1px solid var(--hairline); border-radius:18px 18px 0 0; padding:18px 16px calc(16px + env(safe-area-inset-bottom)); transform:translateY(105%); transition:transform .28s cubic-bezier(.32,.72,0,1); max-height:88vh; max-height:88dvh; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior-y:contain; touch-action:pan-y; box-shadow:0 -12px 40px rgba(0,0,0,0.5);}
   .sheet.show{transform:translateY(0);}
   .sheet h2{margin:0 0 4px; font-family:var(--font-mono); letter-spacing:2px; font-size:16px; color:var(--led-amber);}
   .sheet .sub{font-size:11.5px; color:var(--text-grey); margin-bottom:14px;}
@@ -135,6 +175,8 @@
   .suggestItem:last-child{border-bottom:none;}
   .suggestItem:active{background:var(--board-black);}
   .suggestItem b{color:var(--led-amber); font-weight:700;}
+  .lineErr{display:none; margin-top:6px; font-size:11px; color:var(--signal-red); font-family:var(--font-mono); line-height:1.5;}
+  .lineErr.show{display:block;}
 
   @keyframes pulseGlow{
     0%,100%{box-shadow:0 0 0 0 rgba(232,163,61,0.5), 0 3px 8px rgba(0,0,0,0.4);}
@@ -160,16 +202,22 @@
         <span style="font-size:24px; line-height:1; filter:drop-shadow(0 0 6px rgba(232,163,61,0.4));">👮</span>
         <div class="brand">ALERTE CONTRÔLEUR<small>Réseau tram &amp; bus · Grenoble</small></div>
       </div>
-      <button class="profileBtn" id="profileBtn">?</button>
+      <div class="headerBtns">
+        <button class="iconBtn" id="langBtn" title="Changer de langue / تغيير اللغة">FR</button>
+        <button class="iconBtn" id="notifyBtn" title="Alertes à proximité">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+        </button>
+        <button class="profileBtn" id="profileBtn">?</button>
+      </div>
     </div>
     <div class="tabs">
-      <button class="tab active" data-view="map">Carte</button>
-      <button class="tab" data-view="list">Liste</button>
-      <button class="tab" data-view="mine">Mes signalements</button>
+      <button class="tab active" data-view="map" data-i18n="tabMap">Carte</button>
+      <button class="tab" data-view="list" data-i18n="tabList">Liste</button>
+      <button class="tab" data-view="mine" data-i18n="tabMine">Mes signalements</button>
     </div>
     <div class="stat-row">
-      <div><b id="statActive">0</b> actif(s)</div>
-      <div><b id="statFresh">0</b> récents &lt;10 min</div>
+      <div><b id="statActive">0</b> <span data-i18n="statActive">actif(s)</span></div>
+      <div><b id="statFresh">0</b> <span data-i18n="statFresh">récents &lt;10 min</span></div>
     </div>
   </div>
 
@@ -177,6 +225,12 @@
     <div class="mapWrap" id="mainMapWrap">
       <div class="mapHint">Touchez un point pour voir le détail</div>
       <div id="mainMapEl"></div>
+      <button class="locateBtn" id="locateBtn" aria-label="Me localiser" title="Voir les contrôles près de moi">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M12 2v3M12 19v3M2 12h3M19 12h3"></path>
+        </svg>
+      </button>
     </div>
     <div class="infoCard" id="infoCard">
       <button class="closeCard" id="closeCard">✕</button>
@@ -185,14 +239,23 @@
       <div class="pmeta" id="icMeta"></div>
       <div class="pnote" id="icNote"></div>
       <div class="pacts">
-        <button class="pbtn" id="icConfirm">Toujours là</button>
-        <button class="pbtn left" id="icLeft">Parti</button>
+        <button class="pbtn" id="icConfirm" data-i18n="btnStillThere">Toujours là</button>
+        <button class="pbtn left" id="icLeft" data-i18n="btnLeft">Parti</button>
+        <button class="pbtn left" id="icShare" title="Partager">↗</button>
       </div>
       <button class="pdel" id="icDel" style="display:none;">Supprimer mon signalement</button>
     </div>
   </div>
 
-  <div class="view" id="viewList"><div class="board" id="boardList"></div></div>
+  <div class="view" id="viewList">
+    <div class="filterBar" id="filterBar">
+      <button class="fchip active" data-mode="all" data-i18n="fAll">Tous</button>
+      <button class="fchip" data-mode="Bus" data-i18n="fBus">Bus</button>
+      <button class="fchip" data-mode="Tram" data-i18n="fTram">Tram</button>
+      <select class="lineSelect" id="lineSelect"><option value="all" data-i18n="fAllLines">Toutes lignes</option></select>
+    </div>
+    <div class="board" id="boardList"></div>
+  </div>
   <div class="view" id="viewMine"><div class="board" id="boardMine"></div></div>
 
   <div class="disclaimer">Appli communautaire non officielle. Signalements anonymes fournis par les utilisateurs, exactitude non garantie. Un titre de transport valide reste obligatoire.</div>
@@ -223,8 +286,7 @@
     <div class="field">
       <label>Ligne</label>
       <div class="chips" id="busChips">
-        <button class="chip">C1</button><button class="chip">C2</button><button class="chip">C3</button><button class="chip">C4</button>
-        <button class="chip">C5</button><button class="chip">C6</button><button class="chip">C7</button>
+        <button class="chip">C1</button><button class="chip">C2</button><button class="chip">C3</button><button class="chip">C4</button><button class="chip">C5</button><button class="chip">C6</button><button class="chip">C7</button><button class="chip">C8</button><button class="chip">C10</button><button class="chip">C14</button><button class="chip">15</button><button class="chip">16</button><button class="chip">17</button><button class="chip">18</button><button class="chip">19</button><button class="chip">20</button><button class="chip">21</button><button class="chip">22</button><button class="chip">23</button><button class="chip">24</button><button class="chip">25</button><button class="chip">41</button><button class="chip">42</button><button class="chip">44</button><button class="chip">45</button><button class="chip">46</button><button class="chip">47</button><button class="chip">48</button><button class="chip">49</button><button class="chip">50</button><button class="chip">51</button><button class="chip">54</button><button class="chip">55</button><button class="chip">56</button><button class="chip">59</button><button class="chip">60</button><button class="chip">61</button><button class="chip">63</button><button class="chip">64</button><button class="chip">65</button><button class="chip">66</button><button class="chip">67</button><button class="chip">68</button><button class="chip">70</button><button class="chip">71</button><button class="chip">73</button><button class="chip">N62</button><button class="chip">NAVA</button><button class="chip">NAVB</button>
         <button class="chip">Autre…</button>
       </div>
       <div class="chips" id="tramChips" style="display:none;">
@@ -244,6 +306,7 @@
         <input type="text" id="locInput" autocomplete="off" placeholder="ex : Victor Hugo, direction Échirolles">
         <div class="suggestBox" id="locSuggest"></div>
       </div>
+      <div class="lineErr" id="lineErr"></div>
     </div>
 
     <div class="field">
@@ -278,287 +341,836 @@
   // Rather than tangled line art, use a legible schematic: street grid + river band + neighborhood labels.
   // (schematic SVG map removed — now using real Leaflet + OpenStreetMap, see below)
 
-  // Real stop names + coordinates (lat/lon) from the official M / SMMAG open data
-  // (https://data.mobilites-m.fr/api/points/csv?types=clusters), epci=LaMetro only,
-  // deduplicated by name. 276 real stops covering the Grenoble metro urban area.
+  // Arrets officiels du reseau M Reso (GTFS SEM, periode 20/07/2026-30/08/2026)
+  // 767 zones d'arret, bus + tramway, fournis par l'utilisateur (data.mobilites-m.fr / m-reso).
   const STOP_NAMES = [
-  { name: "Cap des H\u2019", lat: 45.21732, lon: 5.68127 },
-  { name: "Saint-Germain", lat: 45.21015, lon: 5.74408 },
-  { name: "Fontaine Hôtel de Ville - La Source", lat: 45.19134, lon: 5.68727 },
-  { name: "Saint-Michel", lat: 45.11203, lon: 5.68452 },
-  { name: "La Bruyère", lat: 45.1663, lon: 5.7286 },
-  { name: "Cité Jean Macé", lat: 45.19996, lon: 5.7105 },
-  { name: "Marielle Franco - Technisud", lat: 45.16072, lon: 5.70965 },
-  { name: "Louis Vicat", lat: 45.16035, lon: 5.69373 },
-  { name: "Grand Pré", lat: 45.17178, lon: 5.69424 },
-  { name: "Rocher d\u2019Escalade", lat: 45.2432, lon: 5.67907 },
-  { name: "Iles de Mars", lat: 45.13197, lon: 5.70026 },
-  { name: "La Biolle - Gare", lat: 45.23522, lon: 5.66953 },
-  { name: "Bouchayer - Hôtel de Ville", lat: 45.18077, lon: 5.69437 },
-  { name: "Ancienne Mairie", lat: 45.21793, lon: 5.77933 },
-  { name: "Colonel Dumont", lat: 45.1815, lon: 5.72195 },
-  { name: "Hôpital Sud", lat: 45.1469, lon: 5.73274 },
-  { name: "Hôpital - Neuroscience", lat: 45.19833, lon: 5.7439 },
-  { name: "La Poya", lat: 45.19709, lon: 5.67222 },
-  { name: "Beau Site", lat: 45.17591, lon: 5.69696 },
-  { name: "Chemin des Buclos", lat: 45.21581, lon: 5.77226 },
-  { name: "Ile Verte", lat: 45.19753, lon: 5.73725 },
-  { name: "Croix de Montfleury", lat: 45.20879, lon: 5.74934 },
-  { name: "Zella Mehlis", lat: 45.16707, lon: 5.75354 },
-  { name: "Mutualité", lat: 45.19046, lon: 5.73663 },
-  { name: "L\u2019Ovalie (Régulation)", lat: 45.20967, lon: 5.66695 },
-  { name: "L\u2019Iliade", lat: 45.14713, lon: 5.74546 },
-  { name: "Oxford", lat: 45.20571, lon: 5.69992 },
-  { name: "Université - Bibliothèques", lat: 45.19246, lon: 5.7709 },
-  { name: "Victor Hugo", lat: 45.18854, lon: 5.72303 },
-  { name: "Anguisses", lat: 45.17782, lon: 5.77786 },
-  { name: "Anatole France", lat: 45.17186, lon: 5.70495 },
-  { name: "Salengro", lat: 45.17566, lon: 5.70887 },
-  { name: "Le Sonnant", lat: 45.18161, lon: 5.78271 },
-  { name: "Hôpital Michallon - Grésivaudan", lat: 45.20028, lon: 5.74533 },
-  { name: "Doyen Gosse", lat: 45.20138, lon: 5.75303 },
-  { name: "Fiancey - Prédieu", lat: 45.22359, lon: 5.68827 },
-  { name: "Le Crêt", lat: 45.14391, lon: 5.74859 },
-  { name: "Plaine des Sports", lat: 45.18805, lon: 5.78421 },
-  { name: "Saint-Bruno", lat: 45.18833, lon: 5.71351 },
-  { name: "Carronnerie - Ile d\u2019Amour", lat: 45.20116, lon: 5.7588 },
-  { name: "Les Javaux", lat: 45.15034, lon: 5.7499 },
-  { name: "Le Verderet", lat: 45.14694, lon: 5.75428 },
-  { name: "Charles Pajon", lat: 45.21369, lon: 5.75287 },
-  { name: "Seyssins Village", lat: 45.1564, lon: 5.6814 },
-  { name: "La Buisseratière", lat: 45.22308, lon: 5.71778 },
-  { name: "Université - Les Taillées", lat: 45.1917, lon: 5.75833 },
-  { name: "Buclos", lat: 45.20618, lon: 5.77188 },
-  { name: "Louis Maisonnat", lat: 45.18912, lon: 5.69409 },
-  { name: "Condorcet", lat: 45.18553, lon: 5.71823 },
-  { name: "Bergès - Vercors", lat: 45.18417, lon: 5.69071 },
-  { name: "Stade", lat: 45.1435, lon: 5.72943 },
-  { name: "Général de Gaulle", lat: 45.16163, lon: 5.74447 },
-  { name: "Glaïeuls", lat: 45.16964, lon: 5.76358 },
-  { name: "Paul Langevin", lat: 45.14346, lon: 5.72313 },
-  { name: "Les Cimentiers", lat: 45.13047, lon: 5.68357 },
-  { name: "Montfleury", lat: 45.21204, lon: 5.75709 },
-  { name: "Clinique - Portail", lat: 45.16201, lon: 5.67406 },
-  { name: "Gendarmerie", lat: 45.14003, lon: 5.69852 },
-  { name: "Pré au Crêt", lat: 45.14405, lon: 5.7401 },
-  { name: "Portail Rouge", lat: 45.1814, lon: 5.76347 },
-  { name: "Bresson Mairie", lat: 45.1377, lon: 5.74771 },
-  { name: "Mairie-Condamine", lat: 45.21118, lon: 5.75092 },
-  { name: "Saint-Roch", lat: 45.19129, lon: 5.73851 },
-  { name: "Pascal", lat: 45.1995, lon: 5.75527 },
-  { name: "Musée Géo Charles", lat: 45.14878, lon: 5.70172 },
-  { name: "Chavant", lat: 45.18466, lon: 5.73177 },
-  { name: "Le Château", lat: 45.14732, lon: 5.72671 },
-  { name: "Irène Joliot-Curie", lat: 45.12742, lon: 5.69856 },
-  { name: "Coli", lat: 45.18073, lon: 5.76596 },
-  { name: "Verlaine", lat: 45.16193, lon: 5.71613 },
-  { name: "Casamaures - Village", lat: 45.19902, lon: 5.71747 },
-  { name: "Parc Jo Blanchon", lat: 45.17585, lon: 5.75684 },
-  { name: "Bérivière", lat: 45.21882, lon: 5.78312 },
-  { name: "Les Glières", lat: 45.14962, lon: 5.71167 },
-  { name: "Reynoard", lat: 45.16398, lon: 5.72863 },
-  { name: "D\u2019Alembert", lat: 45.18422, lon: 5.71064 },
-  { name: "Grugliasco", lat: 45.15127, lon: 5.70946 },
-  { name: "120 Toises", lat: 45.13625, lon: 5.69496 },
-  { name: "Fauconnière", lat: 45.17684, lon: 5.69402 },
-  { name: "Danielle Casanova", lat: 45.14448, lon: 5.70071 },
-  { name: "Les Léchères", lat: 45.20454, lon: 5.75928 },
-  { name: "Auguste Delaune", lat: 45.14292, lon: 5.71527 },
-  { name: "Plaine Fleurie", lat: 45.20276, lon: 5.76139 },
-  { name: "Ecoles Hospitalières", lat: 45.14638, lon: 5.72973 },
-  { name: "Maisons Neuves", lat: 45.16491, lon: 5.74252 },
-  { name: "Esclangon", lat: 45.19158, lon: 5.7065 },
-  { name: "Université - Condillac", lat: 45.18915, lon: 5.77445 },
-  { name: "Edmond Esmonin", lat: 45.15937, lon: 5.72662 },
-  { name: "Gay Lussac", lat: 45.13645, lon: 5.71214 },
-  { name: "Rondeau", lat: 45.15871, lon: 5.70584 },
-  { name: "Palais de Justice - Gare", lat: 45.19164, lon: 5.71086 },
-  { name: "Grésivaudan", lat: 45.20997, lon: 5.76177 },
-  { name: "Seyssinet-Pariset Village", lat: 45.17052, lon: 5.68074 },
-  { name: "Les Iles", lat: 45.1841, lon: 5.69716 },
-  { name: "Paul Eluard", lat: 45.16512, lon: 5.74887 },
-  { name: "Pied de la Combe", lat: 45.13446, lon: 5.71471 },
-  { name: "Victor Hugo - Belgrade", lat: 45.19123, lon: 5.7252 },
-  { name: "Les Alpilles", lat: 45.18714, lon: 5.76958 },
-  { name: "Lucien Andrieux", lat: 45.16435, lon: 5.72135 },
-  { name: "Gières Gare - Université", lat: 45.18528, lon: 5.78458 },
-  { name: "Les Saules", lat: 45.16226, lon: 5.74155 },
-  { name: "Les Ruires-Boétie", lat: 45.14932, lon: 5.74122 },
-  { name: "Caserne de Bonne", lat: 45.18506, lon: 5.72533 },
-  { name: "Vallier - Catane", lat: 45.18002, lon: 5.70558 },
-  { name: "Pierre Loti", lat: 45.16664, lon: 5.74646 },
-  { name: "Gières Gare - Chamandier", lat: 45.18491, lon: 5.78527 },
-  { name: "Verdun - Préfecture", lat: 45.1883, lon: 5.73144 },
-  { name: "Le Bourg", lat: 45.14781, lon: 5.75116 },
-  { name: "Paul Claudel", lat: 45.17336, lon: 5.73851 },
-  { name: "La Plaine", lat: 45.1726, lon: 5.69689 },
-  { name: "Grand Châtelet", lat: 45.18194, lon: 5.74841 },
-  { name: "Galochère", lat: 45.17878, lon: 5.77315 },
-  { name: "Navis", lat: 45.15627, lon: 5.70842 },
-  { name: "Monmousseau", lat: 45.15354, lon: 5.71188 },
-  { name: "Henri Dunant", lat: 45.17441, lon: 5.7083 },
-  { name: "Marceau - Jardin des Vallons", lat: 45.18245, lon: 5.72217 },
-  { name: "Vigny", lat: 45.16744, lon: 5.72338 },
-  { name: "Pied de Gières", lat: 45.18388, lon: 5.79852 },
-  { name: "Corenc Village", lat: 45.21983, lon: 5.76229 },
-  { name: "Drac", lat: 45.14895, lon: 5.69397 },
-  { name: "Bayard", lat: 45.14591, lon: 5.70478 },
-  { name: "Alsace-Lorraine", lat: 45.18911, lon: 5.7193 },
-  { name: "Docteur Mazet", lat: 45.19128, lon: 5.72201 },
-  { name: "Clos d\u2019Or", lat: 45.16955, lon: 5.72321 },
-  { name: "Lionel Terray", lat: 45.20995, lon: 5.76745 },
-  { name: "Odyssée", lat: 45.15273, lon: 5.74876 },
-  { name: "Chaumetière", lat: 45.21244, lon: 5.77061 },
-  { name: "Haut-Meylan", lat: 45.21798, lon: 5.77913 },
-  { name: "Village Olympique", lat: 45.16411, lon: 5.72404 },
-  { name: "Sainte-Claire - Les Halles", lat: 45.19146, lon: 5.73067 },
-  { name: "Cité Labeye", lat: 45.18234, lon: 5.7598 },
-  { name: "Curie - Vercors", lat: 45.19188, lon: 5.69505 },
-  { name: "Suzanne Noël - Les Bains", lat: 45.17821, lon: 5.74264 },
-  { name: "Croix Rouge", lat: 45.18558, lon: 5.7479 },
-  { name: "Bon Pasteur", lat: 45.17875, lon: 5.7509 },
-  { name: "Lys Rouge", lat: 45.17304, lon: 5.71057 },
-  { name: "Notre-Dame - Musée", lat: 45.19358, lon: 5.73214 },
-  { name: "Championnet", lat: 45.18554, lon: 5.72318 },
-  { name: "André Argouges", lat: 45.17537, lon: 5.74447 },
-  { name: "Saint-Égrève Gare", lat: 45.23573, lon: 5.67163 },
-  { name: "Clemenceau", lat: 45.18388, lon: 5.74107 },
-  { name: "Les Taillées - Universités", lat: 45.19215, lon: 5.75784 },
-  { name: "Vallier - Libération", lat: 45.18013, lon: 5.71608 },
-  { name: "Docteur Schweitzer", lat: 45.17245, lon: 5.70632 },
-  { name: "Eugène Sue", lat: 45.17284, lon: 5.72476 },
-  { name: "Saint-Laurent", lat: 45.19802, lon: 5.73257 },
-  { name: "Aristide Bergès", lat: 45.18551, lon: 5.69465 },
-  { name: "Cimetière Intercommunal", lat: 45.15752, lon: 5.76412 },
-  { name: "Robespierre", lat: 45.15985, lon: 5.75718 },
-  { name: "Hubert Dubedout - Maison du Tourisme", lat: 45.1902, lon: 5.72822 },
-  { name: "Les Alloves", lat: 45.17204, lon: 5.76518 },
-  { name: "Christophe Turc", lat: 45.16137, lon: 5.72414 },
-  { name: "Aiguinards-Hexagone", lat: 45.20556, lon: 5.76449 },
-  { name: "Louis Jouvet", lat: 45.16999, lon: 5.73712 },
-  { name: "Capuche", lat: 45.17614, lon: 5.72539 },
-  { name: "Place de la République", lat: 45.18209, lon: 5.79257 },
-  { name: "Stalingrad-Alliés", lat: 45.17172, lon: 5.72435 },
-  { name: "Epicéa", lat: 45.19496, lon: 5.77481 },
-  { name: "La Bruyère-Parc Jean Verlhac", lat: 45.16635, lon: 5.73118 },
-  { name: "Surieux", lat: 45.15846, lon: 5.72192 },
-  { name: "Beauvert", lat: 45.16417, lon: 5.71792 },
-  { name: "Sablons", lat: 45.19647, lon: 5.75206 },
-  { name: "Vassieux", lat: 45.14303, lon: 5.70002 },
-  { name: "Le Pont-de-Claix Mairie", lat: 45.12345, lon: 5.69775 },
-  { name: "Ponsard", lat: 45.17597, lon: 5.7372 },
-  { name: "Musée Hébert", lat: 45.20564, lon: 5.74888 },
-  { name: "Les Géants", lat: 45.16115, lon: 5.73994 },
-  { name: "Rocheplane", lat: 45.1783, lon: 5.76236 },
-  { name: "La Garenne", lat: 45.22729, lon: 5.76583 },
-  { name: "Mayencin - Champ Roman", lat: 45.18491, lon: 5.77895 },
-  { name: "Denis Papin", lat: 45.13832, lon: 5.71307 },
-  { name: "La Châtelière", lat: 45.16217, lon: 5.74903 },
-  { name: "Les Combes", lat: 45.16807, lon: 5.67875 },
-  { name: "Léon Jouhaux", lat: 45.169, lon: 5.74444 },
-  { name: "Albert 1er de Belgique", lat: 45.18192, lon: 5.73222 },
-  { name: "Auguste Ravier", lat: 45.18399, lon: 5.73965 },
-  { name: "Les Granges", lat: 45.15719, lon: 5.72799 },
-  { name: "Gustave Rivet Provisoire", lat: 45.18136, lon: 5.72547 },
-  { name: "Louise Michel", lat: 45.16976, lon: 5.71287 },
-  { name: "Guy Mocquet", lat: 45.14548, lon: 5.72585 },
-  { name: "Les Écrins", lat: 45.19753, lon: 5.68631 },
-  { name: "Saint-Augustin", lat: 45.17827, lon: 5.74591 },
-  { name: "Chopin", lat: 45.16605, lon: 5.75142 },
-  { name: "Annie Fratellini - Esplanade", lat: 45.19566, lon: 5.71679 },
-  { name: "Bir Hakeim", lat: 45.18886, lon: 5.73639 },
-  { name: "Docteur Martin", lat: 45.18731, lon: 5.72728 },
-  { name: "Cémoi", lat: 45.18495, lon: 5.70573 },
-  { name: "Hôpital Michallon - Belledonne", lat: 45.19714, lon: 5.74758 },
-  { name: "Rue des Alpes", lat: 45.19799, lon: 5.68087 },
-  { name: "Le Mail", lat: 45.16123, lon: 5.72891 },
-  { name: "Marat", lat: 45.19915, lon: 5.68284 },
-  { name: "Colonel Manhès", lat: 45.14647, lon: 5.70177 },
-  { name: "Complexe Sportif", lat: 45.21142, lon: 5.67272 },
-  { name: "Hôtel de Police", lat: 45.1941, lon: 5.73571 },
-  { name: "Marie Curie", lat: 45.14523, lon: 5.71704 },
-  { name: "Teisseire", lat: 45.17081, lon: 5.74016 },
-  { name: "Belvédère", lat: 45.1765, lon: 5.68821 },
-  { name: "Grand Sablon", lat: 45.19903, lon: 5.75 },
-  { name: "Malherbe", lat: 45.16928, lon: 5.73229 },
-  { name: "Les Essarts", lat: 45.1593, lon: 5.71376 },
-  { name: "Echirolles Gare", lat: 45.15302, lon: 5.71848 },
-  { name: "Paul Héroult", lat: 45.14728, lon: 5.71347 },
-  { name: "Karben", lat: 45.24235, lon: 5.67093 },
-  { name: "Château de Sassenage", lat: 45.21224, lon: 5.66167 },
-  { name: "Grande Tronche", lat: 45.20704, lon: 5.74578 },
-  { name: "Vif Gare", lat: 45.04824, lon: 5.68573 },
-  { name: "Jean Prévost", lat: 45.18955, lon: 5.68276 },
-  { name: "Eybens Mairie", lat: 45.14733, lon: 5.74979 },
-  { name: "Driant", lat: 45.18228, lon: 5.7341 },
-  { name: "Champ Roman", lat: 45.18438, lon: 5.76824 },
-  { name: "Seyssinet-Pariset Hôtel de Ville", lat: 45.18032, lon: 5.69707 },
-  { name: "Marcelline", lat: 45.12553, lon: 5.69795 },
-  { name: "Flandrin - Valmy", lat: 45.18719, lon: 5.7448 },
-  { name: "Karl Marx", lat: 45.18652, lon: 5.68729 },
-  { name: "Bachelard", lat: 45.16681, lon: 5.70594 },
-  { name: "La Rampe - Centre-Ville", lat: 45.14948, lon: 5.71818 },
-  { name: "Comboire", lat: 45.14597, lon: 5.69073 },
-  { name: "Stendhal", lat: 45.0871, lon: 5.68586 },
-  { name: "Champs-Elysées", lat: 45.17794, lon: 5.71025 },
-  { name: "Estacade", lat: 45.18593, lon: 5.71744 },
-  { name: "Quinzaine", lat: 45.15149, lon: 5.70664 },
-  { name: "Rue Pasteur", lat: 45.19421, lon: 5.69473 },
-  { name: "Vercors", lat: 45.20065, lon: 5.75103 },
-  { name: "Meylan Mairie", lat: 45.20928, lon: 5.7785 },
-  { name: "Hector Berlioz - Universités", lat: 45.19137, lon: 5.75866 },
-  { name: "Mallifaud", lat: 45.18033, lon: 5.73507 },
-  { name: "Paul Cocat", lat: 45.17226, lon: 5.74478 },
-  { name: "Madeleine", lat: 45.18515, lon: 5.74324 },
-  { name: "Gabriel Fauré - MUSE", lat: 45.19228, lon: 5.7643 },
-  { name: "Flaubert - Clos d\u2019Or", lat: 45.17049, lon: 5.72791 },
-  { name: "Foch - Ferrié", lat: 45.1808, lon: 5.72256 },
-  { name: "Jules Rey", lat: 45.20658, lon: 5.74278 },
-  { name: "Martyrs - Résistance", lat: 45.2081, lon: 5.69661 },
-  { name: "Edison", lat: 45.18183, lon: 5.74091 },
-  { name: "Elsa Triolet", lat: 45.17958, lon: 5.77015 },
-  { name: "La Balmette", lat: 45.12509, lon: 5.68805 },
-  { name: "Gustave Rivet", lat: 45.1817, lon: 5.72783 },
-  { name: "Arlequin", lat: 45.16359, lon: 5.73047 },
-  { name: "Pierre Sémard", lat: 45.18128, lon: 5.75712 },
-  { name: "Vallier - Docteur Calmette", lat: 45.1805, lon: 5.71127 },
-  { name: "Marché d\u2019Intérêt National", lat: 45.17354, lon: 5.71805 },
-  { name: "Bastille", lat: 45.20444, lon: 5.7376 },
-  { name: "Charmettes", lat: 45.1974, lon: 5.69355 },
-  { name: "Jarrie Gare", lat: 45.08387, lon: 5.7424 },
-  { name: "Bajatière", lat: 45.17813, lon: 5.73614 },
-  { name: "Cité Internationale", lat: 45.19508, lon: 5.7112 },
-  { name: "Grand\u2019place", lat: 45.15922, lon: 5.73265 },
-  { name: "Massenet", lat: 45.16771, lon: 5.72108 },
-  { name: "Ecureuil", lat: 45.14261, lon: 5.70384 },
-  { name: "Alpexpo", lat: 45.15449, lon: 5.73379 },
-  { name: "Stade Lesdiguières", lat: 45.16429, lon: 5.71097 },
-  { name: "Berriat - Le Magasin", lat: 45.18849, lon: 5.7058 },
-  { name: "Essarts - La Butte", lat: 45.15588, lon: 5.71909 },
-  { name: "Commanderie", lat: 45.14363, lon: 5.73336 },
-  { name: "Gay", lat: 45.18479, lon: 5.75086 },
-  { name: "Cité Paul Mistral", lat: 45.16855, lon: 5.70479 },
-  { name: "Houille Blanche", lat: 45.17794, lon: 5.7517 },
-  { name: "Jean Racine", lat: 45.16682, lon: 5.74175 },
-  { name: "Arago", lat: 45.19709, lon: 5.71174 },
-  { name: "Jeanne d\u2019Arc", lat: 45.18177, lon: 5.74518 },
-  { name: "Polesud - Alpexpo", lat: 45.15715, lon: 5.73384 },
-  { name: "Xavier Jouvin", lat: 45.1956, lon: 5.73009 },
-  { name: "Abbé Grégoire", lat: 45.18388, lon: 5.71174 },
-  { name: "Edouard Vaillant", lat: 45.17902, lon: 5.75528 },
-  { name: "Le Village", lat: 45.14133, lon: 5.72057 },
-  { name: "Péri - Brossolette", lat: 45.18771, lon: 5.75142 },
-  { name: "Les Côtes", lat: 45.15689, lon: 5.6708 },
-  { name: "Grenoble Hôtel de Ville", lat: 45.18746, lon: 5.73779 },
-  { name: "MC2: Maison de la Culture", lat: 45.17349, lon: 5.73203 },
-  { name: "Centre du graphisme", lat: 45.14185, lon: 5.71816 },
-  { name: "Chorier - Saint-Bruno", lat: 45.18592, lon: 5.71403 },
-  { name: "Roseraie", lat: 45.17901, lon: 5.78101 },
-  { name: "Maison Communale", lat: 45.18395, lon: 5.75378 },
-  { name: "Mounier", lat: 45.179, lon: 5.73179 },
-  { name: "Félix Viallet", lat: 45.19073, lon: 5.71847 },
-  { name: "Hôpital Couple Enfant", lat: 45.20123, lon: 5.74184 },
+  { id: "120TOISE", name: "120 Toises", lat: 45.13625, lon: 5.69496 },
+  { id: "GUERIMAN", name: "16 Août 1944", lat: 45.20414, lon: 5.71545 },
+  { id: "ABBEGREG", name: "Abbé Grégoire", lat: 45.18388, lon: 5.71174 },
+  { id: "AIGUIHEX", name: "Aiguinards-Hexagone", lat: 45.20556, lon: 5.76449 },
+  { id: "ALB", name: "Albert 1er de Belgique", lat: 45.18192, lon: 5.73222 },
+  { id: "ALLIES", name: "Alliés", lat: 45.17398, lon: 5.71427 },
+  { id: "ALEGRANG", name: "Allée des Granges", lat: 45.05795, lon: 5.68472 },
+  { id: "ALPEXPO", name: "Alpexpo", lat: 45.15449, lon: 5.73379 },
+  { id: "ALSACELO", name: "Alsace-Lorraine", lat: 45.18911, lon: 5.7193 },
+  { id: "ANATFRAN", name: "Anatole France", lat: 45.17186, lon: 5.70495 },
+  { id: "ANCIGARE", name: "Ancienne Gare", lat: 45.15978, lon: 5.68178 },
+  { id: "ARO", name: "Ancienne route", lat: 45.20976, lon: 5.71736 },
+  { id: "ARGOUGES", name: "André Argouges", lat: 45.17537, lon: 5.74447 },
+  { id: "ANMAL", name: "André Malraux", lat: 45.09462, lon: 5.74417 },
+  { id: "ANGUISSE", name: "Anguisses", lat: 45.17782, lon: 5.77786 },
+  { id: "ESPLANAD", name: "Annie Fratellini - Esplanade", lat: 45.19566, lon: 5.71679 },
+  { id: "POLOTTI", name: "Antoine Polotti", lat: 45.1486, lon: 5.72251 },
+  { id: "ARAGO", name: "Arago", lat: 45.19709, lon: 5.71174 },
+  { id: "ARBERGES", name: "Aristide Bergès", lat: 45.18551, lon: 5.69465 },
+  { id: "ARLEQUIN", name: "Arlequin", lat: 45.16359, lon: 5.73047 },
+  { id: "ADELAUNE", name: "Auguste Delaune", lat: 45.14292, lon: 5.71527 },
+  { id: "AUGUFERR", name: "Auguste Ferrier", lat: 45.14483, lon: 5.70962 },
+  { id: "AUGURAVI", name: "Auguste Ravier", lat: 45.18399, lon: 5.73965 },
+  { id: "AVREPUB", name: "Avenue de la République", lat: 45.14279, lon: 5.73589 },
+  { id: "AGD", name: "Avenue du Général de Gaulle", lat: 45.22485, lon: 5.79781 },
+  { id: "BACHELAR", name: "Bachelard", lat: 45.16681, lon: 5.70594 },
+  { id: "BAJATIER", name: "Bajatière", lat: 45.17813, lon: 5.73614 },
+  { id: "BALZAZ", name: "Balzac", lat: 45.08728, lon: 5.69421 },
+  { id: "BLE", name: "Bas Levetiere", lat: 45.22472, lon: 5.72491 },
+  { id: "BASMONT", name: "Bas de Mont-Quaix", lat: 45.25288, lon: 5.74174 },
+  { id: "BASPET", name: "Bas de Petesset", lat: 45.25635, lon: 5.71059 },
+  { id: "NOYARBAS", name: "Bascule", lat: 45.24292, lon: 5.63217 },
+  { id: "BASTILLE", name: "Bastille", lat: 45.20444, lon: 5.7376 },
+  { id: "CHEMBATO", name: "Batonnière", lat: 45.22733, lon: 5.75876 },
+  { id: "BOD", name: "Baudonniere", lat: 45.21447, lon: 5.80777 },
+  { id: "BAYANNE", name: "Bayanne", lat: 44.97996, lon: 5.62235 },
+  { id: "BAYARD", name: "Bayard", lat: 45.14591, lon: 5.70478 },
+  { id: "BEAU", name: "Beau Dunois", lat: 45.12535, lon: 5.67234 },
+  { id: "BEAUSITE", name: "Beau Site", lat: 45.17591, lon: 5.69696 },
+  { id: "BEAULIEU", name: "Beaulieu", lat: 45.13855, lon: 5.77355 },
+  { id: "BEAUREVO", name: "Beaurevoir", lat: 45.21009, lon: 5.64861 },
+  { id: "BEAUVERT", name: "Beauvert", lat: 45.16417, lon: 5.71792 },
+  { id: "BEAUVOIR", name: "Beauvoir", lat: 45.15899, lon: 5.68325 },
+  { id: "BELAIR", name: "Bel Air", lat: 45.16106, lon: 5.75525 },
+  { id: "BELLEDON", name: "Belledonne", lat: 45.22268, lon: 5.684 },
+  { id: "BELVEDER", name: "Belvédère", lat: 45.1765, lon: 5.68821 },
+  { id: "BERGVERC", name: "Bergès - Vercors", lat: 45.18417, lon: 5.69071 },
+  { id: "BERLIOGN", name: "Berliognière", lat: 45.08998, lon: 5.69249 },
+  { id: "BERV", name: "Bernin Village", lat: 45.27051, lon: 5.86748 },
+  { id: "BER", name: "Berriat - Le Magasin", lat: 45.18849, lon: 5.7058 },
+  { id: "BIRHAKEI", name: "Bir Hakeim", lat: 45.18886, lon: 5.73639 },
+  { id: "13600", name: "Biviers Mairie", lat: 45.2379, lon: 5.80397 },
+  { id: "13601", name: "Biviers Tennis", lat: 45.23416, lon: 5.79967 },
+  { id: "13300", name: "Biviers, Les Claverins", lat: 45.23334, lon: 5.8085 },
+  { id: "CLV", name: "Biviers, Les Claverins", lat: 45.23305, lon: 5.80708 },
+  { id: "BLANCFON", name: "Blanc Fontaine", lat: 45.21064, lon: 5.65625 },
+  { id: "BOISFRAN", name: "Bois Français", lat: 45.22482, lon: 5.83768 },
+  { id: "BONPASTE", name: "Bon Pasteur", lat: 45.17875, lon: 5.7509 },
+  { id: "BOUCHDV", name: "Bouchayer - Hôtel de Ville", lat: 45.18077, lon: 5.69437 },
+  { id: "BOULODRO", name: "Boulodrome-Ecole", lat: 45.11962, lon: 5.66899 },
+  { id: "BRESSON", name: "Bresson Mairie", lat: 45.1377, lon: 5.74771 },
+  { id: "BRIEGLIS", name: "Brié-et-Angonnes Église", lat: 45.11119, lon: 5.78653 },
+  { id: "BUC1", name: "Buclos", lat: 45.20618, lon: 5.77188 },
+  { id: "BUS", name: "Busserolles", lat: 45.209, lon: 5.79835 },
+  { id: "BERIVIER", name: "Bérivière", lat: 45.21882, lon: 5.78312 },
+  { id: "CAMPVIZ", name: "Camping", lat: 45.08593, lon: 5.77127 },
+  { id: "CHEMI", name: "Canet", lat: 45.21055, lon: 5.70612 },
+  { id: "CAP38", name: "Cap 38", lat: 45.24018, lon: 5.66619 },
+  { id: "CAPDESH", name: "Cap des H'", lat: 45.21732, lon: 5.68127 },
+  { id: "CAPUCHE", name: "Capuche", lat: 45.17614, lon: 5.72539 },
+  { id: "CRE", name: "Carrefour du Replat", lat: 45.16148, lon: 5.85102 },
+  { id: "CARRIERE", name: "Carrière", lat: 45.11472, lon: 5.69018 },
+  { id: "CARONRIE", name: "Carronnerie - Ile d'Amour", lat: 45.20116, lon: 5.7588 },
+  { id: "CASAVILL", name: "Casamaures - Village", lat: 45.19902, lon: 5.71747 },
+  { id: "CASBONNE", name: "Caserne de Bonne", lat: 45.18506, lon: 5.72533 },
+  { id: "CASSOULE", name: "Cassoulet", lat: 44.98229, lon: 5.62309 },
+  { id: "CENSOCIO", name: "Centre Socio-Culturel", lat: 45.15886, lon: 5.75948 },
+  { id: "CENTHEOL", name: "Centre Théologique", lat: 45.20617, lon: 5.75215 },
+  { id: "GRAPH", name: "Centre du graphisme", lat: 45.14185, lon: 5.71816 },
+  { id: "CHAMBORD", name: "Chambord", lat: 45.08519, lon: 5.66714 },
+  { id: "CHAMECHA", name: "Chamechaude", lat: 45.2051, lon: 5.68348 },
+  { id: "CHAMP", name: "Champ Clocher", lat: 45.09222, lon: 5.7702 },
+  { id: "CHAMPFIL", name: "Champ Fila", lat: 45.15627, lon: 5.75505 },
+  { id: "CHAMPROM", name: "Champ Roman", lat: 45.18438, lon: 5.76824 },
+  { id: "EGISE", name: "Champaviotte – Vence", lat: 45.22631, lon: 5.67439 },
+  { id: "CHAMPION", name: "Championnet", lat: 45.18554, lon: 5.72318 },
+  { id: "CHAMPLAR", name: "Champlars", lat: 45.22023, lon: 5.77982 },
+  { id: "CHAMPRON", name: "Champrondet", lat: 45.18578, lon: 5.80285 },
+  { id: "CHAMPSEL", name: "Champs-Elysées", lat: 45.17794, lon: 5.71025 },
+  { id: "CHANT", name: "Chantefeuille", lat: 45.0804, lon: 5.77503 },
+  { id: "MO", name: "Charlaix - Maupertuis", lat: 45.21191, lon: 5.79725 },
+  { id: "CHARLMIC", name: "Charles Michels", lat: 45.19385, lon: 5.68009 },
+  { id: "PAJON", name: "Charles Pajon", lat: 45.21369, lon: 5.75287 },
+  { id: "CHARMETT", name: "Charmettes", lat: 45.1974, lon: 5.69355 },
+  { id: "CHARRIER", name: "Charrières", lat: 45.11599, lon: 5.68888 },
+  { id: "CHAULNES", name: "Chaulnes", lat: 45.23655, lon: 5.63811 },
+  { id: "CHAUMETI", name: "Chaumetière", lat: 45.21244, lon: 5.77061 },
+  { id: "CHAVANT", name: "Chavant", lat: 45.18466, lon: 5.73177 },
+  { id: "FIANCEY", name: "Chemin Fiancey", lat: 45.22864, lon: 5.69171 },
+  { id: "NAMIERE", name: "Chemin de Namière", lat: 45.27232, lon: 5.67853 },
+  { id: "CHEABBE", name: "Chemin de l'Abbé", lat: 45.13521, lon: 5.66842 },
+  { id: "MEG", name: "Chemin de l'Église", lat: 45.22669, lon: 5.78719 },
+  { id: "BUCLOS", name: "Chemin des Buclos", lat: 45.21581, lon: 5.77226 },
+  { id: "LEPLATRE", name: "Chemin des Cottes", lat: 45.09398, lon: 5.79326 },
+  { id: "13604", name: "Chemin des Tières", lat: 45.23505, lon: 5.80502 },
+  { id: "CHATEAUX", name: "Chemin du Parc", lat: 45.27449, lon: 5.60613 },
+  { id: "CHENEVIE", name: "Chenevières", lat: 45.20673, lon: 5.82734 },
+  { id: "CHOPIN", name: "Chopin", lat: 45.16605, lon: 5.75142 },
+  { id: "STBRUNNC", name: "Chorier - Saint-Bruno", lat: 45.18592, lon: 5.71403 },
+  { id: "CHRISTUR", name: "Christophe Turc", lat: 45.16137, lon: 5.72414 },
+  { id: "CHURU", name: "Churut", lat: 45.26474, lon: 5.77743 },
+  { id: "CHRA", name: "Château Randon", lat: 45.24222, lon: 5.82451 },
+  { id: "CHATBEAU", name: "Château de Beaurevoir", lat: 45.21234, lon: 5.65202 },
+  { id: "CHATSASS", name: "Château de Sassenage", lat: 45.21224, lon: 5.66167 },
+  { id: "CHATELAR", name: "Châtelard", lat: 45.27353, lon: 5.60481 },
+  { id: "CIMESEYP", name: "Cimetière", lat: 45.16967, lon: 5.68346 },
+  { id: "PREMOL", name: "Cimetière Intercommunal", lat: 45.15752, lon: 5.76412 },
+  { id: "CIMETIGS", name: "Cimetière du Grand Sablon", lat: 45.19247, lon: 5.74534 },
+  { id: "CITEINTE", name: "Cité Internationale", lat: 45.19508, lon: 5.7112 },
+  { id: "CITEMACE", name: "Cité Jean Macé", lat: 45.19996, lon: 5.7105 },
+  { id: "CITELABE", name: "Cité Labeye", lat: 45.18234, lon: 5.7598 },
+  { id: "CITEPMIS", name: "Cité Paul Mistral", lat: 45.16855, lon: 5.70479 },
+  { id: "CLAIXMAI", name: "Claix Mairie", lat: 45.12025, lon: 5.67247 },
+  { id: "BELLEVUE", name: "Claix, Bellevue", lat: 45.11196, lon: 5.66548 },
+  { id: "CLEMENCE", name: "Clemenceau", lat: 45.18388, lon: 5.74107 },
+  { id: "CLINDAU", name: "Clinique - Portail", lat: 45.16201, lon: 5.67406 },
+  { id: "CLINBELD", name: "Clinique Belledonne", lat: 45.18598, lon: 5.76095 },
+  { id: "LECELLIE", name: "Clinique du Dauphiné", lat: 45.16149, lon: 5.67354 },
+  { id: "CLOSDOMI", name: "Clos Dominique", lat: 45.13546, lon: 5.70127 },
+  { id: "CLOSGRUE", name: "Clos Gérard Gruel", lat: 45.20968, lon: 5.71052 },
+  { id: "CLOSJUV", name: "Clos Jouvin", lat: 45.09693, lon: 5.74585 },
+  { id: "CLOSSTMA", name: "Clos Saint-Martin", lat: 45.20503, lon: 5.71402 },
+  { id: "CLOSDOR", name: "Clos d'Or", lat: 45.16955, lon: 5.72321 },
+  { id: "CLY", name: "Cloyères", lat: 45.2645, lon: 5.87928 },
+  { id: "CCL", name: "Col de Clémencières", lat: 45.23418, lon: 5.72587 },
+  { id: "COLCOMBO", name: "Col de Comboire", lat: 45.14004, lon: 5.6732 },
+  { id: "PALAQUIT", name: "Col de Palaquit", lat: 45.27308, lon: 5.7657 },
+  { id: "COLPORTE", name: "Col de Porte", lat: 45.28982, lon: 5.76704 },
+  { id: "COLVENCE", name: "Col de Vence", lat: 45.234, lon: 5.75107 },
+  { id: "COLARZEL", name: "Col de l'Arzelier", lat: 44.99089, lon: 5.59541 },
+  { id: "CHARME", name: "Col de la Charmette", lat: 45.32189, lon: 5.74005 },
+  { id: "COLAVIER", name: "Colavière", lat: 45.27237, lon: 5.67606 },
+  { id: "COLI", name: "Coli", lat: 45.18073, lon: 5.76596 },
+  { id: "BAR", name: "Collège Barnave", lat: 45.23125, lon: 5.68822 },
+  { id: "COG", name: "Collège Grésivaudan", lat: 45.24028, lon: 5.82078 },
+  { id: "COLLSAUL", name: "Collège des Saules", lat: 45.16143, lon: 5.74306 },
+  { id: "MAT", name: "Collège les Mattons", lat: 45.0863, lon: 5.775 },
+  { id: "CAB", name: "Colonel Dumont", lat: 45.1815, lon: 5.72195 },
+  { id: "COLMANHE", name: "Colonel Manhès", lat: 45.14647, lon: 5.70177 },
+  { id: "COMB", name: "Combeloup", lat: 45.1697, lon: 5.84306 },
+  { id: "COM", name: "Comboire", lat: 45.14597, lon: 5.69073 },
+  { id: "COMMANAL", name: "Commandant Nal", lat: 45.20324, lon: 5.74535 },
+  { id: "COMMANDE", name: "Commanderie", lat: 45.14363, lon: 5.73336 },
+  { id: "COMPLEXE", name: "Complexe Sportif", lat: 45.21142, lon: 5.67272 },
+  { id: "CONDORCE", name: "Condorcet", lat: 45.18553, lon: 5.71823 },
+  { id: "CONRADKI", name: "Conrad Kilian", lat: 45.20592, lon: 5.70944 },
+  { id: "CORENCMA", name: "Corenc Mairie", lat: 45.20974, lon: 5.75272 },
+  { id: "CORENCVI", name: "Corenc Village", lat: 45.21983, lon: 5.76229 },
+  { id: "CORP", name: "Corps d'Uriage", lat: 45.17815, lon: 5.86484 },
+  { id: "COSSEY", name: "Cossey", lat: 45.13895, lon: 5.67006 },
+  { id: "COUBERTI", name: "Coubertin", lat: 45.20004, lon: 5.83528 },
+  { id: "CROISEM", name: "Croisement 6", lat: 45.15287, lon: 5.8254 },
+  { id: "CROIXROU", name: "Croix Rouge", lat: 45.18558, lon: 5.7479 },
+  { id: "13602", name: "Croix Saint-Philibert", lat: 45.23225, lon: 5.79871 },
+  { id: "CXCI", name: "Croix de Cibeins", lat: 45.22588, lon: 5.78472 },
+  { id: "CXMONTFL", name: "Croix de Montfleury", lat: 45.20879, lon: 5.74934 },
+  { id: "CXRAMEAU", name: "Croix des Rameaux", lat: 45.22374, lon: 5.78177 },
+  { id: "CVAX", name: "Croix des Varvoux", lat: 45.26623, lon: 5.86216 },
+  { id: "CXPATRE", name: "Croix du Pâtre", lat: 45.16821, lon: 5.76174 },
+  { id: "TESS", name: "Crolles, Teisseire", lat: 45.27219, lon: 5.88748 },
+  { id: "CULFROID", name: "Cul Froid", lat: 45.17006, lon: 5.80858 },
+  { id: "CURIVERC", name: "Curie - Vercors", lat: 45.19188, lon: 5.69505 },
+  { id: "CUVILLEU", name: "Cuvilleux", lat: 45.2349, lon: 5.68768 },
+  { id: "CEMOI", name: "Cémoi", lat: 45.18495, lon: 5.70573 },
+  { id: "ALEMBERT", name: "D'Alembert", lat: 45.18422, lon: 5.71064 },
+  { id: "CASANOVA", name: "Danielle Casanova", lat: 45.14448, lon: 5.70071 },
+  { id: "DENPAPIN", name: "Denis Papin", lat: 45.13832, lon: 5.71307 },
+  { id: "DRMARTIN", name: "Docteur Martin", lat: 45.18731, lon: 5.72728 },
+  { id: "DRMAZET", name: "Docteur Mazet", lat: 45.19128, lon: 5.72201 },
+  { id: "DRSCHWEI", name: "Docteur Schweitzer", lat: 45.17245, lon: 5.70632 },
+  { id: "DOMENEMA", name: "Domène Mairie", lat: 45.20152, lon: 5.83821 },
+  { id: "PRIEURE", name: "Domène, Le Prieuré", lat: 45.20489, lon: 5.83576 },
+  { id: "DOYENGOS", name: "Doyen Gosse", lat: 45.20138, lon: 5.75303 },
+  { id: "DRAC2", name: "Drac", lat: 45.14895, lon: 5.69397 },
+  { id: "DRIANT", name: "Driant", lat: 45.18228, lon: 5.7341 },
+  { id: "ECHIGARE", name: "Echirolles Gare", lat: 45.15302, lon: 5.71848 },
+  { id: "JBRUANT", name: "Ecole Jules Bruant", lat: 45.12172, lon: 5.8144 },
+  { id: "ECOLEREY", name: "Ecole Reymure", lat: 45.06908, lon: 5.69334 },
+  { id: "ECOLHOSP", name: "Ecoles Hospitalières", lat: 45.14638, lon: 5.72973 },
+  { id: "EJCURIE", name: "Ecoles Joliot-Curie", lat: 45.08403, lon: 5.77517 },
+  { id: "ECUREUIL", name: "Ecureuil", lat: 45.14261, lon: 5.70384 },
+  { id: "EDELWEIS", name: "Edelweiss", lat: 45.18149, lon: 5.78755 },
+  { id: "EDISON", name: "Edison", lat: 45.18183, lon: 5.74091 },
+  { id: "EDMOESMO", name: "Edmond Esmonin", lat: 45.15937, lon: 5.72662 },
+  { id: "EDROSTAN", name: "Edmond Rostand", lat: 45.17446, lon: 5.75432 },
+  { id: "CHANDON", name: "Edmée Chandon", lat: 45.13671, lon: 5.7083 },
+  { id: "EDVAILLA", name: "Edouard Vaillant", lat: 45.17902, lon: 5.75528 },
+  { id: "EGLISESE", name: "Eglise", lat: 45.23999, lon: 5.68407 },
+  { id: "ELSATRIO", name: "Elsa Triolet", lat: 45.17958, lon: 5.77015 },
+  { id: "EPICEA", name: "Epicéa", lat: 45.19496, lon: 5.77481 },
+  { id: "ESCLANGO", name: "Esclangon", lat: 45.19158, lon: 5.7065 },
+  { id: "ROMANCHE", name: "Espace Navarre", lat: 45.08662, lon: 5.73067 },
+  { id: "ESSARTS", name: "Essarts - La Butte", lat: 45.15588, lon: 5.71909 },
+  { id: "CHORCOND", name: "Estacade", lat: 45.18593, lon: 5.71744 },
+  { id: "ETIEGRAP", name: "Etienne Grappe", lat: 45.17213, lon: 5.75769 },
+  { id: "EUGENESU", name: "Eugène Sue", lat: 45.17284, lon: 5.72476 },
+  { id: "EYBMAIRI", name: "Eybens Mairie", lat: 45.14733, lon: 5.74979 },
+  { id: "LEBOURG", name: "Eybens, Le Bourg", lat: 45.14781, lon: 5.75116 },
+  { id: "EYGALA", name: "Eygala", lat: 45.21385, lon: 5.76461 },
+  { id: "FAU", name: "Fauconnière", lat: 45.17684, lon: 5.69402 },
+  { id: "PELLOUTI", name: "Fernand Pelloutier", lat: 45.15084, lon: 5.71482 },
+  { id: "PREDIEU", name: "Fiancey - Prédieu", lat: 45.22359, lon: 5.68827 },
+  { id: "VALMY", name: "Flandrin - Valmy", lat: 45.18719, lon: 5.7448 },
+  { id: "FLAUCLOS", name: "Flaubert - Clos d'Or", lat: 45.17049, lon: 5.72791 },
+  { id: "FOCHFERI", name: "Foch - Ferrié", lat: 45.1808, lon: 5.72256 },
+  { id: "FOCHAIRE", name: "Fochaire", lat: 45.27158, lon: 5.67442 },
+  { id: "FONDRATE", name: "Fond Ratel", lat: 45.12215, lon: 5.68935 },
+  { id: "FONTAGNE", name: "Fontagneux", lat: 45.08728, lon: 5.70786 },
+  { id: "FONTAHDV", name: "Fontaine Hôtel de Ville - La Source", lat: 45.19134, lon: 5.68727 },
+  { id: "ANCIEMAI", name: "Fontaine, Ancienne Mairie", lat: 45.19272, lon: 5.67806 },
+  { id: "STEYNARD", name: "Fontaine, Saint-Eynard", lat: 45.20113, lon: 5.69021 },
+  { id: "FONTCIM", name: "Fontanil-Cornillon Cimetière", lat: 45.25823, lon: 5.66385 },
+  { id: "FONTANIM", name: "Fontanil-Cornillon Mairie", lat: 45.25618, lon: 5.66633 },
+  { id: "FONVIEIL", name: "Fontvieille", lat: 45.2592, lon: 5.7449 },
+  { id: "FRBLUMET", name: "François Blumet", lat: 45.20966, lon: 5.677 },
+  { id: "FRQUESNA", name: "François Quesnay", lat: 45.1479, lon: 5.73517 },
+  { id: "FURONNIE", name: "Furonnières", lat: 45.12596, lon: 5.67131 },
+  { id: "FELIXVIA", name: "Félix Viallet", lat: 45.19073, lon: 5.71847 },
+  { id: "GABFAURE", name: "Gabriel Fauré - MUSE", lat: 45.19228, lon: 5.7643 },
+  { id: "GALOCHER", name: "Galochère", lat: 45.17878, lon: 5.77315 },
+  { id: "RIGAU", name: "Garcinière", lat: 45.25164, lon: 5.69488 },
+  { id: "GARES", name: "Gares", lat: 45.19078, lon: 5.71554 },
+  { id: "CIG", name: "Garlettes", lat: 45.14524, lon: 5.67678 },
+  { id: "LEGATINE", name: "Gatinet", lat: 45.22453, lon: 5.71878 },
+  { id: "GAVANIER", name: "Gavanière", lat: 45.24122, lon: 5.68148 },
+  { id: "GAY", name: "Gay", lat: 45.18479, lon: 5.75086 },
+  { id: "GAYLUSSA", name: "Gay Lussac", lat: 45.13645, lon: 5.71214 },
+  { id: "LALUIRE", name: "Gendarmerie", lat: 45.14003, lon: 5.69852 },
+  { id: "JRCHA", name: "Gières Gare - Chamandier", lat: 45.18491, lon: 5.78527 },
+  { id: "GIERGARE", name: "Gières Gare - Université", lat: 45.18528, lon: 5.78458 },
+  { id: "GLAIEULS", name: "Glaïeuls", lat: 45.16964, lon: 5.76358 },
+  { id: "GDCHATEL", name: "Grand Châtelet", lat: 45.18194, lon: 5.74841 },
+  { id: "GNA", name: "Grand Nacré", lat: 45.17818, lon: 5.87052 },
+  { id: "GRANDPRE", name: "Grand Pré", lat: 45.17178, lon: 5.69424 },
+  { id: "CENTRESU", name: "Grand Pré - Centre Sud", lat: 45.17084, lon: 5.69457 },
+  { id: "GRDSABLO", name: "Grand Sablon", lat: 45.19903, lon: 5.75 },
+  { id: "GDVERGER", name: "Grand Verger", lat: 45.07385, lon: 5.72957 },
+  { id: "GP", name: "Grand'place", lat: 45.15922, lon: 5.73265 },
+  { id: "GDTRONCH", name: "Grande Tronche", lat: 45.20704, lon: 5.74578 },
+  { id: "GRANG", name: "Grange Haute", lat: 45.24558, lon: 5.69563 },
+  { id: "GREHOTEL", name: "Grenoble Hôtel de Ville", lat: 45.18746, lon: 5.73779 },
+  { id: "TEISSEIR", name: "Grenoble, Teisseire", lat: 45.17081, lon: 5.74016 },
+  { id: "VH", name: "Grenoble, Victor Hugo", lat: 45.18854, lon: 5.72303 },
+  { id: "VICTHUGO", name: "Grenoble, Victor Hugo", lat: 45.18938, lon: 5.72499 },
+  { id: "CLINMUT", name: "Groupe Hospitalier Mutualiste", lat: 45.18126, lon: 5.71028 },
+  { id: "GRUGLIAS", name: "Grugliasco", lat: 45.15127, lon: 5.70946 },
+  { id: "GRESIVAU", name: "Grésivaudan", lat: 45.20997, lon: 5.76177 },
+  { id: "GUSTRIVE", name: "Gustave Rivet", lat: 45.1817, lon: 5.72783 },
+  { id: "RIV", name: "Gustave Rivet Provisoire", lat: 45.18136, lon: 5.72547 },
+  { id: "GUYMOCQU", name: "Guy Mocquet", lat: 45.14548, lon: 5.72585 },
+  { id: "DEGAULLE", name: "Général de Gaulle", lat: 45.16163, lon: 5.74447 },
+  { id: "FOPHI", name: "Gérard Philipe", lat: 45.19667, lon: 5.6773 },
+  { id: "FAUX", name: "Hameau Le Faux", lat: 45.17162, lon: 5.84658 },
+  { id: "HVENCE", name: "Hameau de Vence", lat: 45.24179, lon: 5.75433 },
+  { id: "CHAUMIER", name: "Hameau des Chaumières", lat: 45.1547, lon: 5.68938 },
+  { id: "HTMEYLAN", name: "Haut-Meylan", lat: 45.21798, lon: 5.77913 },
+  { id: "HAUT", name: "Hautes Vues", lat: 45.163, lon: 5.83953 },
+  { id: "HBERLUNI", name: "Hector Berlioz - Universités", lat: 45.19137, lon: 5.75866 },
+  { id: "HDUNANT", name: "Henri Dunant", lat: 45.17441, lon: 5.7083 },
+  { id: "HENRIREY", name: "Henri Rey", lat: 45.1474, lon: 5.67773 },
+  { id: "HENRIWAL", name: "Henri Wallon", lat: 45.17563, lon: 5.76392 },
+  { id: "HEBOURG", name: "Herbeys Le Bourg", lat: 45.13887, lon: 5.79311 },
+  { id: "HORLOGE", name: "Horloge", lat: 45.21363, lon: 5.69885 },
+  { id: "HOUILLEB", name: "Houille Blanche", lat: 45.17794, lon: 5.7517 },
+  { id: "DUBEDOUT", name: "Hubert Dubedout - Maison du Tourisme", lat: 45.1902, lon: 5.72822 },
+  { id: "NEUR", name: "Hôpital - Neuroscience", lat: 45.19833, lon: 5.7439 },
+  { id: "TRONCHOP", name: "Hôpital Couple Enfant", lat: 45.20123, lon: 5.74184 },
+  { id: "HOPMICHA", name: "Hôpital Michallon - Belledonne", lat: 45.19714, lon: 5.74758 },
+  { id: "MICHALLO", name: "Hôpital Michallon - Grésivaudan", lat: 45.20028, lon: 5.74533 },
+  { id: "HOPITSUD", name: "Hôpital Sud", lat: 45.1469, lon: 5.73274 },
+  { id: "HOTELBEL", name: "Hôtel Bellevue", lat: 45.21153, lon: 5.71775 },
+  { id: "HOPOLICE", name: "Hôtel de Police", lat: 45.1941, lon: 5.73571 },
+  { id: "INR", name: "INRIA", lat: 45.21752, lon: 5.80742 },
+  { id: "IL", name: "Ile Verte", lat: 45.19753, lon: 5.73725 },
+  { id: "ILESCORD", name: "Iles Cordées", lat: 45.25971, lon: 5.62608 },
+  { id: "ILESMARS", name: "Iles de Mars", lat: 45.13197, lon: 5.70026 },
+  { id: "IRENEJOL", name: "Irène Joliot-Curie", lat: 45.12742, lon: 5.69856 },
+  { id: "SMUOIE", name: "Izards Patte d'Oie", lat: 45.16887, lon: 5.86492 },
+  { id: "JACOBINS", name: "Jacobins", lat: 45.06461, lon: 5.69128 },
+  { id: "GARJA", name: "Jarrie Gare", lat: 45.08387, lon: 5.7424 },
+  { id: "JEANPREV", name: "Jean Prévost", lat: 45.18955, lon: 5.68276 },
+  { id: "JRACINE", name: "Jean Racine", lat: 45.16682, lon: 5.74175 },
+  { id: "JEANNARC", name: "Jeanne d'Arc", lat: 45.18177, lon: 5.74518 },
+  { id: "JFLANDRI", name: "Jules Flandrin", lat: 45.20854, lon: 5.75845 },
+  { id: "JULESGUE", name: "Jules Guesde", lat: 45.19791, lon: 5.68878 },
+  { id: "JULESREY", name: "Jules Rey", lat: 45.20658, lon: 5.74278 },
+  { id: "KARBEN", name: "Karben", lat: 45.24235, lon: 5.67093 },
+  { id: "KARLMARX", name: "Karl Marx", lat: 45.18652, lon: 5.68729 },
+  { id: "LAGNEAU", name: "L'Agneau", lat: 45.1613, lon: 5.68296 },
+  { id: "ALI", name: "L'Alliance", lat: 45.08184, lon: 5.769 },
+  { id: "LAMPHI", name: "L'Amphi", lat: 45.13035, lon: 5.69975 },
+  { id: "CENTRSOC", name: "L'Arche", lat: 45.17817, lon: 5.69702 },
+  { id: "ARGOUD", name: "L'Argoud", lat: 45.15433, lon: 5.68029 },
+  { id: "ARZELIER", name: "L'Arzelier", lat: 44.99692, lon: 5.60258 },
+  { id: "LENCLOS", name: "L'Enclos", lat: 45.1333, lon: 5.77484 },
+  { id: "LHERMITA", name: "L'Hermitage", lat: 45.21501, lon: 5.70418 },
+  { id: "ILIADE", name: "L'Iliade", lat: 45.14713, lon: 5.74546 },
+  { id: "BRIECOLE", name: "L'Olympe", lat: 45.11784, lon: 5.78285 },
+  { id: "ORATOIRE", name: "L'Oratoire", lat: 45.19819, lon: 5.83412 },
+  { id: "ORIEL", name: "L'Oriel", lat: 45.08937, lon: 5.68355 },
+  { id: "OVALIE", name: "L'Ovalie (Régulation)", lat: 45.20967, lon: 5.66695 },
+  { id: "USINENOR", name: "L'Usine Nord", lat: 45.03, lon: 5.65281 },
+  { id: "LETOILE", name: "L'Étoile", lat: 45.13788, lon: 5.7033 },
+  { id: "CLBAL", name: "La Balmette", lat: 45.12509, lon: 5.68805 },
+  { id: "BANCHARD", name: "La Banchardière", lat: 45.21726, lon: 5.71279 },
+  { id: "BASCULE", name: "La Bascule", lat: 45.07181, lon: 5.65496 },
+  { id: "LABAUME", name: "La Baume", lat: 45.16003, lon: 5.68982 },
+  { id: "BIOLLE", name: "La Biolle - Gare", lat: 45.23522, lon: 5.66953 },
+  { id: "BRIOT", name: "La Briot", lat: 45.19299, lon: 5.81948 },
+  { id: "GRBRU", name: "La Bruyère", lat: 45.1663, lon: 5.7286 },
+  { id: "BRUYERE", name: "La Bruyère-Parc Jean Verlhac", lat: 45.16635, lon: 5.73118 },
+  { id: "BUIS", name: "La Buisseratière", lat: 45.22308, lon: 5.71778 },
+  { id: "CARONBAS", name: "La Carronnerie Basse", lat: 45.20107, lon: 5.7584 },
+  { id: "CHANTERA", name: "La Chanteraie", lat: 45.11012, lon: 5.66548 },
+  { id: "LACHARRI", name: "La Charrière", lat: 45.01277, lon: 5.61587 },
+  { id: "CHENE", name: "La Chenevarie", lat: 45.17334, lon: 5.85764 },
+  { id: "CHIAISE", name: "La Chiaise", lat: 45.26117, lon: 5.69831 },
+  { id: "CHIEZE", name: "La Chièze", lat: 45.12118, lon: 5.68251 },
+  { id: "CHATELIE", name: "La Châtelière", lat: 45.16217, lon: 5.74903 },
+  { id: "LACHENAI", name: "La Chênaie", lat: 45.17051, lon: 5.80746 },
+  { id: "CIMEMONT", name: "La Cime de Mont-Quaix", lat: 45.25733, lon: 5.74609 },
+  { id: "CIMEBOUR", name: "La Cime du Bourg", lat: 45.04812, lon: 5.66739 },
+  { id: "LACOMBE", name: "La Combe", lat: 45.17412, lon: 5.79001 },
+  { id: "CORNEDOR", name: "La Corne d'Or", lat: 45.21809, lon: 5.76046 },
+  { id: "CROIX", name: "La Croix", lat: 45.07055, lon: 5.64494 },
+  { id: "CRXROLLA", name: "La Croix Rolland", lat: 45.1292, lon: 5.67128 },
+  { id: "CROI", name: "La Croix de Pinet", lat: 45.17245, lon: 5.87398 },
+  { id: "LACUCHE", name: "La Cuche", lat: 45.25606, lon: 5.62814 },
+  { id: "DETOURBE", name: "La Détourbe", lat: 45.22278, lon: 5.7927 },
+  { id: "LAFAURIE", name: "La Faurie", lat: 45.17542, lon: 5.79467 },
+  { id: "LAFOY", name: "La Foy", lat: 45.2171, lon: 5.77634 },
+  { id: "FRENAIE", name: "La Frênaie", lat: 45.17338, lon: 5.79514 },
+  { id: "GARDE", name: "La Garde", lat: 45.07049, lon: 5.65062 },
+  { id: "GARENNE", name: "La Garenne", lat: 45.22729, lon: 5.76583 },
+  { id: "LAGOMMA", name: "La Gomma", lat: 45.21513, lon: 5.71914 },
+  { id: "GRANGE", name: "La Grange", lat: 45.03933, lon: 5.66126 },
+  { id: "MARITELL", name: "La Maritelle", lat: 45.14162, lon: 5.74135 },
+  { id: "LAMELLE", name: "La Melle", lat: 45.07063, lon: 5.72713 },
+  { id: "LAMONTA", name: "La Monta", lat: 45.23799, lon: 5.68861 },
+  { id: "PERRIERE", name: "La Perrière", lat: 45.18935, lon: 5.81079 },
+  { id: "LAPIERRE", name: "La Pierre", lat: 44.98916, lon: 5.62198 },
+  { id: "PINEA", name: "La Pinéa - St Robert", lat: 45.23565, lon: 5.67549 },
+  { id: "POMMERAI", name: "La Pommeraie", lat: 45.08765, lon: 5.67206 },
+  { id: "LAPOYA", name: "La Poya", lat: 45.19709, lon: 5.67222 },
+  { id: "LAPRAIRI", name: "La Prairie", lat: 45.29462, lon: 5.76561 },
+  { id: "PERE", name: "La Pérérée", lat: 45.17626, lon: 5.86102 },
+  { id: "RAMPE", name: "La Rampe - Centre-Ville", lat: 45.14948, lon: 5.71818 },
+  { id: "REV", name: "La Revirée", lat: 45.20773, lon: 5.76854 },
+  { id: "VEUREYRI", name: "La Rive", lat: 45.26981, lon: 5.61825 },
+  { id: "ROLLANDI", name: "La Rollandière", lat: 45.21501, lon: 5.66112 },
+  { id: "RONZ", name: "La Ronzière", lat: 45.16881, lon: 5.84064 },
+  { id: "RONZY", name: "La Ronzy", lat: 45.12083, lon: 5.67593 },
+  { id: "LASERRAL", name: "La Serralière", lat: 45.17283, lon: 5.79806 },
+  { id: "LASURE", name: "La Sure", lat: 45.20279, lon: 5.68586 },
+  { id: "LATOUR", name: "La Tour", lat: 45.03822, lon: 5.70418 },
+  { id: "LATUILE", name: "La Tuilerie", lat: 45.13617, lon: 5.82423 },
+  { id: "LAVALONE", name: "La Valonne", lat: 45.05031, lon: 5.67129 },
+  { id: "LAVILLE", name: "La Ville", lat: 45.17409, lon: 5.80262 },
+  { id: "LACHAL", name: "Lachal", lat: 45.22242, lon: 5.72475 },
+  { id: "LAGAY", name: "Lagay", lat: 45.1408, lon: 5.74997 },
+  { id: "BARBET", name: "Le Barbet", lat: 45.25801, lon: 5.70815 },
+  { id: "BASQUAIX", name: "Le Bas de Quaix", lat: 45.25399, lon: 5.70142 },
+  { id: "BAZ", name: "Le Bazeau", lat: 45.2659, lon: 5.69985 },
+  { id: "BOURNET", name: "Le Bournet", lat: 45.15765, lon: 5.68975 },
+  { id: "BERYL", name: "Le Béryl", lat: 45.2748, lon: 5.61283 },
+  { id: "CANAL", name: "Le Canal", lat: 45.05212, lon: 5.7104 },
+  { id: "CARINA", name: "Le Carina", lat: 45.16238, lon: 5.76305 },
+  { id: "CHALET", name: "Le Chalet", lat: 45.04333, lon: 5.6644 },
+  { id: "LECHAPON", name: "Le Chapon", lat: 45.17096, lon: 5.82185 },
+  { id: "LECHENIL", name: "Le Chenil", lat: 45.1631, lon: 5.8123 },
+  { id: "CHOLLET", name: "Le Chollet", lat: 45.14025, lon: 5.78364 },
+  { id: "CHATEAU", name: "Le Château", lat: 45.14732, lon: 5.72671 },
+  { id: "COT", name: "Le Coteau", lat: 45.12642, lon: 5.68648 },
+  { id: "LECRET", name: "Le Crêt", lat: 45.14391, lon: 5.74859 },
+  { id: "CEDRE", name: "Le Cèdre", lat: 45.20783, lon: 5.75552 },
+  { id: "LEGORGET", name: "Le Gorget", lat: 45.21529, lon: 5.74853 },
+  { id: "LEGOUILL", name: "Le Gouillat", lat: 45.25474, lon: 5.77111 },
+  { id: "GRIMPI", name: "Le Grimpillon", lat: 45.08233, lon: 5.77515 },
+  { id: "VAGCH", name: "Le Gros Chêne", lat: 45.07839, lon: 5.70208 },
+  { id: "LEGUA", name: "Le Gua", lat: 45.20969, lon: 5.66443 },
+  { id: "LEGUAMAI", name: "Le Gua Mairie", lat: 45.02211, lon: 5.64457 },
+  { id: "JAB", name: "Le Japin", lat: 45.18754, lon: 5.80743 },
+  { id: "LEMAIL", name: "Le Mail", lat: 45.16123, lon: 5.72891 },
+  { id: "LEMARAIS", name: "Le Marais", lat: 45.16412, lon: 5.75044 },
+  { id: "MASSEGU", name: "Le Masségu", lat: 45.05194, lon: 5.67464 },
+  { id: "MAUPA", name: "Le Maupas", lat: 45.15926, lon: 5.81904 },
+  { id: "MEINGET", name: "Le Meinget", lat: 45.07973, lon: 5.66297 },
+  { id: "EGREMOLL", name: "Le Mollard", lat: 45.25822, lon: 5.69591 },
+  { id: "MOULIN", name: "Le Moulin", lat: 45.01516, lon: 5.7045 },
+  { id: "MEMO", name: "Le Mémorial", lat: 45.25429, lon: 5.84088 },
+  { id: "LEPARL", name: "Le Parlement", lat: 45.15864, lon: 5.67447 },
+  { id: "ECOLELP", name: "Le Pavillon", lat: 45.07999, lon: 5.73469 },
+  { id: "LPE", name: "Le Penet", lat: 45.15876, lon: 5.84836 },
+  { id: "LEPERROU", name: "Le Perroud", lat: 45.17245, lon: 5.81036 },
+  { id: "PETIBRIO", name: "Le Petit Brion", lat: 45.06225, lon: 5.69018 },
+  { id: "PINET", name: "Le Pinet d'Uriage", lat: 45.16524, lon: 5.84899 },
+  { id: "LEPLATR", name: "Le Plâtre", lat: 45.11776, lon: 5.7479 },
+  { id: "PONTGENE", name: "Le Pont de Genevrey", lat: 45.02852, lon: 5.65171 },
+  { id: "PONTMAS", name: "Le Pont du Mas", lat: 45.08679, lon: 5.78887 },
+  { id: "PCM", name: "Le Pont-de-Claix Mairie", lat: 45.12345, lon: 5.69775 },
+  { id: "POULAT", name: "Le Poulat", lat: 45.07444, lon: 5.66002 },
+  { id: "LEPRIOU", name: "Le Priou", lat: 45.15698, lon: 5.6788 },
+  { id: "PRISME", name: "Le Prisme", lat: 45.16639, lon: 5.69055 },
+  { id: "PEAGEDEV", name: "Le Péage", lat: 45.0577, lon: 5.77102 },
+  { id: "LEREFUGE", name: "Le Refuge", lat: 45.07462, lon: 5.69959 },
+  { id: "REPLAT", name: "Le Replat", lat: 45.1209, lon: 5.78154 },
+  { id: "REPOSOIR", name: "Le Reposoir", lat: 45.20945, lon: 5.71644 },
+  { id: "LEREYNET", name: "Le Reynet", lat: 45.16989, lon: 5.81322 },
+  { id: "LERIF", name: "Le Rif", lat: 45.0323, lon: 5.65546 },
+  { id: "ROCH", name: "Le Rocharey", lat: 45.17497, lon: 5.87056 },
+  { id: "ROCHEFOR", name: "Le Rochefort", lat: 45.10164, lon: 5.68534 },
+  { id: "LROSCO", name: "Le Rossin de Corps", lat: 45.17034, lon: 5.85429 },
+  { id: "RUISSET", name: "Le Ruisset", lat: 45.25007, lon: 5.63156 },
+  { id: "PLACESAP", name: "Le Sappey-en-Chartreuse Place", lat: 45.25948, lon: 5.77706 },
+  { id: "SAINTEYN", name: "Le Sappey-en-Chartreuse, Saint-Eynard", lat: 45.24926, lon: 5.76534 },
+  { id: "SONNANT", name: "Le Sonnant", lat: 45.18161, lon: 5.78271 },
+  { id: "VERDERET", name: "Le Verderet", lat: 45.14694, lon: 5.75428 },
+  { id: "LEVERNAY", name: "Le Vernay", lat: 44.97015, lon: 5.60875 },
+  { id: "VERNET", name: "Le Vernet Croix", lat: 45.09617, lon: 5.73978 },
+  { id: "VILLAGE", name: "Le Village", lat: 45.14133, lon: 5.72057 },
+  { id: "ALBERGES", name: "Les Alberges", lat: 45.13148, lon: 5.81903 },
+  { id: "LESALLAS", name: "Les Allas", lat: 45.07547, lon: 5.7786 },
+  { id: "ALLOVES", name: "Les Alloves", lat: 45.17204, lon: 5.76518 },
+  { id: "PROMOSOC", name: "Les Alpilles", lat: 45.18714, lon: 5.76958 },
+  { id: "ANGONNES", name: "Les Angonnes", lat: 45.13993, lon: 5.77617 },
+  { id: "ARN", name: "Les Arnauds", lat: 45.20671, lon: 5.84803 },
+  { id: "13603", name: "Les Arriots", lat: 45.23036, lon: 5.7944 },
+  { id: "BAUCHES", name: "Les Bauches", lat: 45.11083, lon: 5.67865 },
+  { id: "BONNAIS", name: "Les Bonnais", lat: 45.24058, lon: 5.67257 },
+  { id: "BEALIERE", name: "Les Béalières", lat: 45.21153, lon: 5.7907 },
+  { id: "CHABER", name: "Les Chaberts", lat: 45.10734, lon: 5.74936 },
+  { id: "CHARBON", name: "Les Charbonnaux", lat: 45.10097, lon: 5.74215 },
+  { id: "CHAUMES", name: "Les Chaumes", lat: 45.1266, lon: 5.67411 },
+  { id: "SACHE", name: "Les Chênes", lat: 45.218, lon: 5.65323 },
+  { id: "CIMENTIE", name: "Les Cimentiers", lat: 45.13047, lon: 5.68357 },
+  { id: "CONDAM", name: "Les Condamines", lat: 45.04472, lon: 5.70732 },
+  { id: "CORNIERS", name: "Les Corniers", lat: 45.08176, lon: 5.78758 },
+  { id: "ECHALIER", name: "Les Echalières", lat: 45.26824, lon: 5.61944 },
+  { id: "ENGENIER", name: "Les Engenières", lat: 45.2196, lon: 5.66022 },
+  { id: "LESESSAR", name: "Les Essarts", lat: 45.1593, lon: 5.71376 },
+  { id: "13309", name: "Les Eymes", lat: 45.25635, lon: 5.84718 },
+  { id: "LESFAURE", name: "Les Faures", lat: 45.01439, lon: 5.61354 },
+  { id: "LESFAUVE", name: "Les Fauvettes", lat: 45.20589, lon: 5.71784 },
+  { id: "FOVOG", name: "Les Fontainades - Le Vog", lat: 45.18907, lon: 5.69867 },
+  { id: "LESFORGE", name: "Les Forges", lat: 45.07716, lon: 5.76858 },
+  { id: "GARCINS", name: "Les Garcins", lat: 45.06389, lon: 5.66986 },
+  { id: "GLAIRAUX", name: "Les Glairaux", lat: 45.21901, lon: 5.67949 },
+  { id: "GLIERES", name: "Les Glières", lat: 45.14962, lon: 5.71167 },
+  { id: "GR", name: "Les Granges", lat: 45.15719, lon: 5.72799 },
+  { id: "GUILBERT", name: "Les Guiberts", lat: 45.03859, lon: 5.70576 },
+  { id: "GUICHARD", name: "Les Guichards", lat: 45.12655, lon: 5.8167 },
+  { id: "PLGEANTS", name: "Les Géants", lat: 45.16115, lon: 5.73994 },
+  { id: "LESILES", name: "Les Iles", lat: 45.1841, lon: 5.69716 },
+  { id: "ISLE", name: "Les Isles", lat: 45.04881, lon: 5.70664 },
+  { id: "JAILLIER", name: "Les Jaillières", lat: 45.22103, lon: 5.79007 },
+  { id: "JAVAUX", name: "Les Javaux", lat: 45.15034, lon: 5.7499 },
+  { id: "MOLLARSA", name: "Les Jonquilles", lat: 45.26467, lon: 5.7742 },
+  { id: "LECHERES", name: "Les Léchères", lat: 45.20454, lon: 5.75928 },
+  { id: "MARRONNI", name: "Les Marronniers", lat: 45.27636, lon: 5.61105 },
+  { id: "LEMA", name: "Les Maréchaux", lat: 45.24994, lon: 5.83626 },
+  { id: "MORTES", name: "Les Mortes", lat: 45.19635, lon: 5.82887 },
+  { id: "MURIERS", name: "Les Mûriers", lat: 45.21549, lon: 5.77954 },
+  { id: "OISEAUX", name: "Les Oiseaux", lat: 45.21506, lon: 5.76867 },
+  { id: "PAMPRES", name: "Les Pampres", lat: 45.11536, lon: 5.66589 },
+  { id: "PARCS", name: "Les Parcs", lat: 45.21658, lon: 5.652 },
+  { id: "PAUT", name: "Les Pauttats", lat: 45.01148, lon: 5.70161 },
+  { id: "PEIFEND", name: "Les Peiffendes", lat: 45.15716, lon: 5.8224 },
+  { id: "PEUPLE", name: "Les Peupliers", lat: 45.04571, lon: 5.70237 },
+  { id: "LESPIES", name: "Les Pies", lat: 45.19957, lon: 5.66989 },
+  { id: "PLATANES", name: "Les Platanes", lat: 45.08933, lon: 5.6777 },
+  { id: "LPO", name: "Les Pompiers", lat: 45.27516, lon: 5.87978 },
+  { id: "PUIS", name: "Les Puis", lat: 45.17206, lon: 5.81643 },
+  { id: "PEROUSES", name: "Les Pérouses", lat: 45.12456, lon: 5.67937 },
+  { id: "RAT", name: "Les Ratz", lat: 45.25833, lon: 5.85122 },
+  { id: "RIVETS", name: "Les Rivets", lat: 45.19482, lon: 5.82455 },
+  { id: "ROSES", name: "Les Roses", lat: 45.11791, lon: 5.66739 },
+  { id: "ROS", name: "Les Rossets", lat: 45.01659, lon: 5.64081 },
+  { id: "RUIRES", name: "Les Ruires-Boétie", lat: 45.14932, lon: 5.74122 },
+  { id: "SAILLANT", name: "Les Saillants", lat: 45.02463, lon: 5.6458 },
+  { id: "SAUL", name: "Les Saules", lat: 45.16226, lon: 5.74155 },
+  { id: "SIMIA", name: "Les Simianes", lat: 45.11612, lon: 5.75778 },
+  { id: "TAILLIS", name: "Les Taillis", lat: 45.11315, lon: 5.66577 },
+  { id: "TAILLEES", name: "Les Taillées - Universités", lat: 45.19215, lon: 5.75784 },
+  { id: "TERRATS", name: "Les Terrats", lat: 45.16914, lon: 5.79285 },
+  { id: "THEVE", name: "Les Thévenets", lat: 45.11571, lon: 5.75102 },
+  { id: "TRAVERS", name: "Les Travers", lat: 45.09132, lon: 5.79162 },
+  { id: "SMUVAL", name: "Les Valets", lat: 45.16747, lon: 5.85787 },
+  { id: "VAX", name: "Les Varvoux", lat: 45.26404, lon: 5.85915 },
+  { id: "VERNES", name: "Les Vernes", lat: 45.20713, lon: 5.83398 },
+  { id: "VIGNES", name: "Les Vignes", lat: 45.13809, lon: 5.74574 },
+  { id: "ECRINS", name: "Les Écrins", lat: 45.19753, lon: 5.68631 },
+  { id: "EVE", name: "Les Évêquaux", lat: 45.23879, lon: 5.81757 },
+  { id: "LEVETIER", name: "Levetière", lat: 45.22629, lon: 5.72548 },
+  { id: "TER", name: "Lionel Terray", lat: 45.20995, lon: 5.76745 },
+  { id: "LLN", name: "Lotissement La Noyarey", lat: 45.16175, lon: 5.84271 },
+  { id: "GAGNIERE", name: "Louis Gagnière", lat: 45.21485, lon: 5.68576 },
+  { id: "LOUISJOU", name: "Louis Jouvet", lat: 45.16999, lon: 5.73712 },
+  { id: "MAISONNA", name: "Louis Maisonnat", lat: 45.18912, lon: 5.69409 },
+  { id: "SEYSROND", name: "Louis Vicat", lat: 45.16035, lon: 5.69373 },
+  { id: "LMICHEL", name: "Louise Michel", lat: 45.16976, lon: 5.71287 },
+  { id: "GRAND", name: "Lucien Andrieux", lat: 45.16435, lon: 5.72135 },
+  { id: "LYC", name: "Lycée du Grésivaudan", lat: 45.21334, lon: 5.78103 },
+  { id: "LYCBACHA", name: "Lycée du Grésivaudan - Bachais", lat: 45.21416, lon: 5.7791 },
+  { id: "LYSROUGE", name: "Lys Rouge", lat: 45.17304, lon: 5.71057 },
+  { id: "LEOLA", name: "Léo Lagrange", lat: 45.08448, lon: 5.73474 },
+  { id: "LEONJOUH", name: "Léon Jouhaux", lat: 45.169, lon: 5.74444 },
+  { id: "MC2", name: "MC2: Maison de la Culture", lat: 45.17349, lon: 5.73203 },
+  { id: "MADELEIN", name: "Madeleine", lat: 45.18515, lon: 5.74324 },
+  { id: "MAIRIECO", name: "Mairie-Condamine", lat: 45.21118, lon: 5.75092 },
+  { id: "MAISON", name: "Maison Blanche", lat: 45.11181, lon: 5.80512 },
+  { id: "MC", name: "Maison Communale", lat: 45.18395, lon: 5.75378 },
+  { id: "MUS", name: "Maison de la Musique", lat: 45.20959, lon: 5.78135 },
+  { id: "MAISANCI", name: "Maison des Anciens", lat: 45.15975, lon: 5.72325 },
+  { id: "MAISNEUV", name: "Maisons Neuves", lat: 45.16491, lon: 5.74252 },
+  { id: "MAC", name: "Malacher", lat: 45.20988, lon: 5.78679 },
+  { id: "MALADIER", name: "Maladière", lat: 45.20773, lon: 5.68048 },
+  { id: "MALHERBE", name: "Malherbe", lat: 45.16928, lon: 5.73229 },
+  { id: "MALHIVER", name: "Malhivert", lat: 45.13254, lon: 5.66688 },
+  { id: "MALISSOL", name: "Malissolles", lat: 45.08396, lon: 5.7047 },
+  { id: "MALLIFAU", name: "Mallifaud", lat: 45.18033, lon: 5.73507 },
+  { id: "MARAT", name: "Marat", lat: 45.19915, lon: 5.68284 },
+  { id: "MARCSANG", name: "Marc Sangnier", lat: 45.16486, lon: 5.68915 },
+  { id: "MARCEAU", name: "Marceau - Jardin des Vallons", lat: 45.18245, lon: 5.72217 },
+  { id: "GONNADIE", name: "Marcel Paul", lat: 45.07745, lon: 5.73156 },
+  { id: "MARCELLI", name: "Marcelline", lat: 45.12553, lon: 5.69795 },
+  { id: "MARCHAND", name: "Marchandises", lat: 45.11483, lon: 5.80766 },
+  { id: "MAINNATI", name: "Marché d'Intérêt National", lat: 45.17354, lon: 5.71805 },
+  { id: "MARIANNE", name: "Marianne", lat: 45.13495, lon: 5.69291 },
+  { id: "MARIECUR", name: "Marie Curie", lat: 45.14523, lon: 5.71704 },
+  { id: "CEACAMB", name: "Marie-Louise Paris - CEA", lat: 45.20216, lon: 5.70431 },
+  { id: "RONDEAU", name: "Marielle Franco - Technisud", lat: 45.16072, lon: 5.70965 },
+  { id: "MARESIST", name: "Martyrs - Résistance", lat: 45.2081, lon: 5.69661 },
+  { id: "LEMASGAC", name: "Mas Caché", lat: 45.2177, lon: 5.72187 },
+  { id: "MASGARNI", name: "Mas Garni", lat: 45.06078, lon: 5.68819 },
+  { id: "MASDESIL", name: "Mas des Iles", lat: 45.16727, lon: 5.69424 },
+  { id: "MASSENET", name: "Massenet", lat: 45.16771, lon: 5.72108 },
+  { id: "MAUPERTJ", name: "Maupertuis", lat: 45.10558, lon: 5.74645 },
+  { id: "MAYENCIN", name: "Mayencin - Champ Roman", lat: 45.18491, lon: 5.77895 },
+  { id: "MEYLMAIR", name: "Meylan Mairie", lat: 45.20928, lon: 5.7785 },
+  { id: "ANCMAIRI", name: "Meylan, Ancienne Mairie", lat: 45.21793, lon: 5.77933 },
+  { id: "MIRIBEL", name: "Miribel", lat: 44.97466, lon: 5.621 },
+  { id: "SAMOL", name: "Mollard Pichon", lat: 45.21364, lon: 5.65236 },
+  { id: "MONMOUSS", name: "Monmousseau", lat: 45.15354, lon: 5.71188 },
+  { id: "BRIE", name: "Mont Rolland", lat: 45.11528, lon: 5.78405 },
+  { id: "MONTQUAI", name: "Mont-Quaix", lat: 45.25575, lon: 5.74284 },
+  { id: "LARIVO", name: "Mont-Saint-Martin, La Rivoire", lat: 45.26869, lon: 5.6686 },
+  { id: "MG", name: "Montbonnot Gare", lat: 45.22834, lon: 5.80434 },
+  { id: "MP", name: "Montbonnot-Saint-Martin, Le Prieuré", lat: 45.22538, lon: 5.81203 },
+  { id: "MONTCHAV", name: "Montchaboud Le Village", lat: 45.09498, lon: 5.76482 },
+  { id: "MONTFLEU", name: "Montfleury", lat: 45.21204, lon: 5.75709 },
+  { id: "MONUMENT", name: "Monument", lat: 45.217, lon: 5.7536 },
+  { id: "MORE", name: "Moretière", lat: 45.25405, lon: 5.69438 },
+  { id: "MOUCHERO", name: "Moucherotte", lat: 45.12579, lon: 5.68096 },
+  { id: "MOUNIER", name: "Mounier", lat: 45.179, lon: 5.73179 },
+  { id: "MOUTONNE", name: "Moutonnées", lat: 45.22838, lon: 5.68422 },
+  { id: "LAMURAIL", name: "Murailles", lat: 45.17825, lon: 5.69178 },
+  { id: "MURET", name: "Muret", lat: 45.22618, lon: 5.68616 },
+  { id: "BOURG", name: "Murianette, Le Bourg", lat: 45.19187, lon: 5.81647 },
+  { id: "MUSGEOCH", name: "Musée Géo Charles", lat: 45.14878, lon: 5.70172 },
+  { id: "MUSHEBER", name: "Musée Hébert", lat: 45.20564, lon: 5.74888 },
+  { id: "MUTUALIT", name: "Mutualité", lat: 45.19046, lon: 5.73663 },
+  { id: "DRAC", name: "Mémorial", lat: 45.12265, lon: 5.69102 },
+  { id: "NARBONNE", name: "Narbonne", lat: 45.21398, lon: 5.71026 },
+  { id: "NAVIS", name: "Navis", lat: 45.15627, lon: 5.70842 },
+  { id: "NEYRBELL", name: "Neyrpic - Belledonne", lat: 45.18669, lon: 5.75716 },
+  { id: "NOTREDAM", name: "Notre-Dame - Musée", lat: 45.19358, lon: 5.73214 },
+  { id: "NODAMLAC", name: "Notre-Dame de Lachal", lat: 45.08736, lon: 5.69011 },
+  { id: "NDCV", name: "Notre-Dame-de-Commiers Le Village", lat: 45.00967, lon: 5.70015 },
+  { id: "NERON", name: "Néron", lat: 45.21782, lon: 5.69334 },
+  { id: "ODYSSEE", name: "Odyssée", lat: 45.15273, lon: 5.74876 },
+  { id: "OXF", name: "Oxford", lat: 45.20571, lon: 5.69992 },
+  { id: "NED", name: "Pablo Neruda", lat: 45.17438, lon: 5.76192 },
+  { id: "PALJUSTI", name: "Palais de Justice - Gare", lat: 45.19164, lon: 5.71086 },
+  { id: "FTL", name: "Palluel", lat: 45.25502, lon: 5.66171 },
+  { id: "PFMITTER", name: "Parc François Mitterrand", lat: 45.16287, lon: 5.6853 },
+  { id: "BLANCHON", name: "Parc Jo Blanchon", lat: 45.17585, lon: 5.75684 },
+  { id: "VOHRIGEN", name: "Parc Vöhringen", lat: 45.07888, lon: 5.76947 },
+  { id: "PASCAL", name: "Pascal", lat: 45.1995, lon: 5.75527 },
+  { id: "PCLAUDEL", name: "Paul Claudel", lat: 45.17336, lon: 5.73851 },
+  { id: "PAULCOCA", name: "Paul Cocat", lat: 45.17226, lon: 5.74478 },
+  { id: "PAULELUA", name: "Paul Eluard", lat: 45.16512, lon: 5.74887 },
+  { id: "PHEROULT", name: "Paul Héroult", lat: 45.14728, lon: 5.71347 },
+  { id: "LANGEVIN", name: "Paul Langevin", lat: 45.14346, lon: 5.72313 },
+  { id: "PAVILLON", name: "Pavillon", lat: 45.1084, lon: 5.67425 },
+  { id: "PERCEVAL", name: "Percevalière", lat: 45.17016, lon: 5.68682 },
+  { id: "PERIERES", name: "Perrières", lat: 45.26209, lon: 5.6247 },
+  { id: "PTCHATEL", name: "Petit Châtelard", lat: 45.27608, lon: 5.61213 },
+  { id: "PTTRONCH", name: "Petite Tronche", lat: 45.20195, lon: 5.73416 },
+  { id: "PIEDGIER", name: "Pied de Gières", lat: 45.18388, lon: 5.79852 },
+  { id: "COMBE", name: "Pied de la Combe", lat: 45.13446, lon: 5.71471 },
+  { id: "PIERRELO", name: "Pierre Loti", lat: 45.16664, lon: 5.74646 },
+  { id: "PIERSEMA", name: "Pierre Sémard", lat: 45.18128, lon: 5.75712 },
+  { id: "PLIBERAT", name: "Place de la Libération", lat: 45.20682, lon: 5.66281 },
+  { id: "PLALOUIS", name: "Place de la Louisiane", lat: 45.20876, lon: 5.76321 },
+  { id: "PLREPUBL", name: "Place de la République", lat: 45.18209, lon: 5.79257 },
+  { id: "CHAT", name: "Place du Château", lat: 45.07572, lon: 5.77221 },
+  { id: "PLACA", name: "Place du Laca", lat: 45.11379, lon: 5.72863 },
+  { id: "PLACMARC", name: "Place du Marché Cachin", lat: 45.19588, lon: 5.69065 },
+  { id: "SMVINOUX", name: "Place du Village", lat: 45.20387, lon: 5.71634 },
+  { id: "PLAINEFL", name: "Plaine Fleurie", lat: 45.20276, lon: 5.76139 },
+  { id: "PLAINEDS", name: "Plaine des Sports", lat: 45.18805, lon: 5.78421 },
+  { id: "PLANF", name: "Planfay Bas", lat: 45.27869, lon: 5.71357 },
+  { id: "COMBALEY", name: "Planfay Combaleyre", lat: 45.27742, lon: 5.71585 },
+  { id: "PLANFAY", name: "Planfay Haut", lat: 45.27874, lon: 5.71787 },
+  { id: "POLESUD", name: "Polesud - Alpexpo", lat: 45.15715, lon: 5.73384 },
+  { id: "POMAREY", name: "Pomarey", lat: 45.28232, lon: 5.71079 },
+  { id: "POMAR", name: "Pomarey Bas", lat: 45.28045, lon: 5.70961 },
+  { id: "POMPIDOU", name: "Pompidou", lat: 45.11993, lon: 5.69255 },
+  { id: "PONSARD", name: "Ponsard", lat: 45.17597, lon: 5.7372 },
+  { id: "PTROUGE", name: "Pont Rouge", lat: 45.11832, lon: 5.69254 },
+  { id: "PBER", name: "Pont de Bernin", lat: 45.27394, lon: 5.87009 },
+  { id: "PONC", name: "Pont de Champ", lat: 45.08849, lon: 5.73074 },
+  { id: "PTVENCE", name: "Pont de Vence", lat: 45.23009, lon: 5.6823 },
+  { id: "PV", name: "Pont de Venon", lat: 45.17823, lon: 5.79043 },
+  { id: "SARCROZ", name: "Pont du Croz", lat: 45.27669, lon: 5.75747 },
+  { id: "EGREGUA", name: "Pont du Gua", lat: 45.27608, lon: 5.70727 },
+  { id: "PORTAILR", name: "Portail Rouge", lat: 45.1814, lon: 5.76347 },
+  { id: "PORTGRES", name: "Porte du Grésivaudan", lat: 45.18253, lon: 5.77665 },
+  { id: "POSTE", name: "Poste", lat: 45.1211, lon: 5.67214 },
+  { id: "POTIE", name: "Potié", lat: 45.17088, lon: 5.75859 },
+  { id: "PRAPAROS", name: "Praparis - Les Roses", lat: 45.23226, lon: 5.64503 },
+  { id: "PRAPARIS", name: "Praparis Usine", lat: 45.22925, lon: 5.6497 },
+  { id: "EGRECOLE", name: "Proveysieux Village", lat: 45.26335, lon: 5.69973 },
+  { id: "PROVIDEN", name: "Providence", lat: 45.22111, lon: 5.76456 },
+  { id: "PREFLEUR", name: "Pré Fleury", lat: 45.20183, lon: 5.66763 },
+  { id: "PRM", name: "Pré Millet", lat: 45.22158, lon: 5.81285 },
+  { id: "PRENOUVE", name: "Pré Nouvel", lat: 45.15141, lon: 5.68039 },
+  { id: "PREAUCR", name: "Pré au Crêt", lat: 45.14405, lon: 5.7401 },
+  { id: "EAU", name: "Pré de l'Eau", lat: 45.22387, lon: 5.82043 },
+  { id: "PREORME", name: "Pré de l'Orme", lat: 45.10964, lon: 5.6884 },
+  { id: "PREBIL", name: "Pré du Bil", lat: 45.02466, lon: 5.70658 },
+  { id: "PRELENFR", name: "Prélenfrey Eglise", lat: 45.01693, lon: 5.6133 },
+  { id: "PELISIER", name: "Pélissière", lat: 45.07057, lon: 5.67506 },
+  { id: "PERIBROS", name: "Péri - Brossolette", lat: 45.18771, lon: 5.75142 },
+  { id: "PLACEQUA", name: "Quaix-en-Chartreuse Place", lat: 45.25319, lon: 5.71732 },
+  { id: "ECOLE", name: "Quaix-en-Chartreuse Village", lat: 45.25346, lon: 5.71992 },
+  { id: "QUINZAIN", name: "Quinzaine", lat: 45.15149, lon: 5.70664 },
+  { id: "RAFOUR", name: "Rafour", lat: 45.24868, lon: 5.66688 },
+  { id: "RAYCHANA", name: "Raymond Chanas", lat: 45.15968, lon: 5.73822 },
+  { id: "RENECASS", name: "René Cassin", lat: 45.2045, lon: 5.84416 },
+  { id: "RS", name: "Revirée - Sayettes", lat: 45.2122, lon: 5.76731 },
+  { id: "REYNOARD", name: "Reynoard", lat: 45.16398, lon: 5.72863 },
+  { id: "RIPAILLE", name: "Ripaillère", lat: 45.22682, lon: 5.72078 },
+  { id: "RISSET", name: "Risset", lat: 45.10724, lon: 5.67309 },
+  { id: "VIFGEND", name: "Rivalta", lat: 45.05301, lon: 5.67655 },
+  { id: "RIVOIRE", name: "Rivoire de la Dame", lat: 45.21493, lon: 5.65169 },
+  { id: "ROBESPIE", name: "Robespierre", lat: 45.15985, lon: 5.75718 },
+  { id: "MOLLARD", name: "Rochasson", lat: 45.22364, lon: 5.7678 },
+  { id: "ROCHEPLA", name: "Rocheplane", lat: 45.1783, lon: 5.76236 },
+  { id: "ROCHEPLE", name: "Rochepleine", lat: 45.24459, lon: 5.67517 },
+  { id: "ROCHERES", name: "Rocher d'Escalade", lat: 45.2432, lon: 5.67907 },
+  { id: "RONDEURO", name: "Rond-Point de l'Europe", lat: 45.09312, lon: 5.68375 },
+  { id: "SEYRON", name: "Rondeau", lat: 45.15871, lon: 5.70584 },
+  { id: "RHINDANU", name: "Rosa Parks", lat: 45.17497, lon: 5.70522 },
+  { id: "ROSERAIE", name: "Roseraie", lat: 45.17901, lon: 5.78101 },
+  { id: "ROUDIER", name: "Roudier", lat: 45.24812, lon: 5.73164 },
+  { id: "ROUSTEGR", name: "Route de Saint-Egrève", lat: 45.25488, lon: 5.7048 },
+  { id: "RSM", name: "Route de Saint-Martin", lat: 45.13947, lon: 5.82817 },
+  { id: "ROZATIER", name: "Rozatière", lat: 45.08706, lon: 5.70241 },
+  { id: "RUEPASTE", name: "Rue Pasteur", lat: 45.19421, lon: 5.69473 },
+  { id: "LALUNE", name: "Rue de la Lune", lat: 45.15551, lon: 5.67222 },
+  { id: "SACRISTI", name: "Rue de la Sacristie", lat: 45.07081, lon: 5.69538 },
+  { id: "RUEALPES", name: "Rue des Alpes", lat: 45.19799, lon: 5.68087 },
+  { id: "DEPORTES", name: "Rue des Déportés", lat: 45.17829, lon: 5.72771 },
+  { id: "RPR", name: "Rue du Pré Roux", lat: 45.27094, lon: 5.88743 },
+  { id: "VARCESRE", name: "République", lat: 45.08635, lon: 5.68298 },
+  { id: "16AOUT44", name: "Résistance", lat: 45.20341, lon: 5.71433 },
+  { id: "STM", name: "ST Microelectronics", lat: 45.26694, lon: 5.88495 },
+  { id: "SABLONS", name: "Sablons", lat: 45.19647, lon: 5.75206 },
+  { id: "STEANGE", name: "Saint-Ange", lat: 45.09683, lon: 5.68367 },
+  { id: "STAUGUST", name: "Saint-Augustin", lat: 45.17827, lon: 5.74591 },
+  { id: "STBARTHE", name: "Saint-Barthélémy", lat: 44.99986, lon: 5.62946 },
+  { id: "STBRUNO", name: "Saint-Bruno", lat: 45.18833, lon: 5.71351 },
+  { id: "STGERMAI", name: "Saint-Germain", lat: 45.21015, lon: 5.74408 },
+  { id: "SIG", name: "Saint-Ismier Gare", lat: 45.24594, lon: 5.83112 },
+  { id: "NOYARSTJ", name: "Saint-Jean", lat: 45.23891, lon: 5.63425 },
+  { id: "STJBOSCO", name: "Saint-Jean Bosco", lat: 45.21282, lon: 5.77305 },
+  { id: "STLAUREN", name: "Saint-Laurent", lat: 45.19802, lon: 5.73257 },
+  { id: "SMHVILLA", name: "Saint-Martin-d'Hères Village", lat: 45.16512, lon: 5.76552 },
+  { id: "MAIRIESM", name: "Saint-Martin-le-Vinoux Hôtel de Ville", lat: 45.20826, lon: 5.70685 },
+  { id: "LARIVOIR", name: "Saint-Martin-le-Vinoux, La Rivoire", lat: 45.22001, lon: 5.71507 },
+  { id: "LESCOMBE", name: "Saint-Martin-le-Vinoux, Les Combes", lat: 45.20964, lon: 5.718 },
+  { id: "SAINTMIC", name: "Saint-Michel", lat: 45.11203, lon: 5.68452 },
+  { id: "STMURY", name: "Saint-Mury", lat: 45.21947, lon: 5.78613 },
+  { id: "SNU", name: "Saint-Nizier-d'Uriage", lat: 45.16418, lon: 5.83474 },
+  { id: "SPAULMAI", name: "Saint-Paul-de-Varces Place", lat: 45.07167, lon: 5.6426 },
+  { id: "SAINTPE", name: "Saint-Pierre Eglise", lat: 45.02819, lon: 5.70607 },
+  { id: "STROCH", name: "Saint-Roch", lat: 45.19129, lon: 5.73851 },
+  { id: "STVICTOR", name: "Saint-Victor", lat: 45.2286, lon: 5.78928 },
+  { id: "EGR", name: "Saint-Égrève Gare", lat: 45.23573, lon: 5.67163 },
+  { id: "BELLEVU", name: "Saint-Égrève, Bellevue", lat: 45.24406, lon: 5.69244 },
+  { id: "STECLAIR", name: "Sainte-Claire - Les Halles", lat: 45.19146, lon: 5.73067 },
+  { id: "SALENGRO", name: "Salengro", lat: 45.17566, lon: 5.70887 },
+  { id: "SARCENA", name: "Sarcenas Le Village", lat: 45.2734, lon: 5.75861 },
+  { id: "COTE", name: "Sassenage, Les Côtes", lat: 45.21006, lon: 5.64744 },
+  { id: "SAVOY", name: "Savoyardière", lat: 45.27833, lon: 5.70833 },
+  { id: "SEYHDV", name: "Seyssinet-Pariset Hôtel de Ville", lat: 45.18032, lon: 5.69707 },
+  { id: "SNETVILA", name: "Seyssinet-Pariset Village", lat: 45.17052, lon: 5.68074 },
+  { id: "LAPLAINE", name: "Seyssinet-Pariset, La Plaine", lat: 45.1726, lon: 5.69689 },
+  { id: "LECOMB", name: "Seyssinet-Pariset, Les Combes", lat: 45.16807, lon: 5.67875 },
+  { id: "PLV", name: "Seyssins Village", lat: 45.1564, lon: 5.6814 },
+  { id: "LESCOTES", name: "Seyssins, Les Côtes", lat: 45.15689, lon: 5.6708 },
+  { id: "SOU", name: "Souchet", lat: 45.20983, lon: 5.7138 },
+  { id: "SOUSFRET", name: "Sous La Frette", lat: 45.25036, lon: 5.73532 },
+  { id: "SOUSPERO", name: "Sous-Perroud", lat: 45.1703, lon: 5.81077 },
+  { id: "BRSOU", name: "Souveyron", lat: 45.13006, lon: 5.77782 },
+  { id: "STGCOMMI", name: "St-Georges-de-Commiers Gare", lat: 45.04363, lon: 5.70174 },
+  { id: "STADE", name: "Stade", lat: 45.1435, lon: 5.72943 },
+  { id: "STADLESD", name: "Stade Lesdiguières", lat: 45.16429, lon: 5.71097 },
+  { id: "CDSTA", name: "Stade Perrouault", lat: 45.07545, lon: 5.72738 },
+  { id: "STALALLI", name: "Stalingrad-Alliés", lat: 45.17172, lon: 5.72435 },
+  { id: "STEND", name: "Stendhal", lat: 45.0871, lon: 5.68586 },
+  { id: "SURIEUX", name: "Surieux", lat: 45.15846, lon: 5.72192 },
+  { id: "LESBAINS", name: "Suzanne Noël - Les Bains", lat: 45.17821, lon: 5.74264 },
+  { id: "TAV", name: "Tavernolles", lat: 45.13557, lon: 5.77096 },
+  { id: "TREFFORI", name: "Trefforine", lat: 45.20446, lon: 5.66499 },
+  { id: "TUILERIE", name: "Tuilerie", lat: 45.16906, lon: 5.69215 },
+  { id: "BIBLIUNI", name: "Université - Bibliothèques", lat: 45.19246, lon: 5.7709 },
+  { id: "BIOLOGIE", name: "Université - Biologie", lat: 45.19195, lon: 5.77474 },
+  { id: "CONDIUNI", name: "Université - Condillac", lat: 45.18915, lon: 5.77445 },
+  { id: "IUTUFRAP", name: "Université - IUT-STAPS", lat: 45.19766, lon: 5.77588 },
+  { id: "TA", name: "Université - Les Taillées", lat: 45.1917, lon: 5.75833 },
+  { id: "UGA", name: "Uriage Gare", lat: 45.14399, lon: 5.82949 },
+  { id: "URIOL", name: "Uriol", lat: 45.06063, lon: 5.66856 },
+  { id: "VALALLIE", name: "Val d'Allières", lat: 45.1069, lon: 5.66532 },
+  { id: "VALEYBEN", name: "Val d'Eybens", lat: 45.15905, lon: 5.74558 },
+  { id: "VALLCATA", name: "Vallier - Catane", lat: 45.18002, lon: 5.70558 },
+  { id: "VACA", name: "Vallier - Docteur Calmette", lat: 45.1805, lon: 5.71127 },
+  { id: "VALLIBE", name: "Vallier - Libération", lat: 45.18013, lon: 5.71608 },
+  { id: "VASSIEUX", name: "Vassieux", lat: 45.14303, lon: 5.70002 },
+  { id: "VAULBAS", name: "Vaulnaveys-Le-Bas Le Village", lat: 45.10549, lon: 5.80042 },
+  { id: "VAULHAUT", name: "Vaulnaveys-Le-Haut Le Village", lat: 45.11934, lon: 5.81099 },
+  { id: "VENCEECO", name: "Vence EcoParc", lat: 45.22773, lon: 5.66846 },
+  { id: "VENONMAI", name: "Venon Mairie", lat: 45.17165, lon: 5.80482 },
+  { id: "VERCORS", name: "Vercors", lat: 45.20065, lon: 5.75103 },
+  { id: "VERDUN", name: "Verdun - Préfecture", lat: 45.1883, lon: 5.73144 },
+  { id: "VERLAINE", name: "Verlaine", lat: 45.16193, lon: 5.71613 },
+  { id: "VERT", name: "Vert Sapin", lat: 45.12558, lon: 5.67844 },
+  { id: "VEUREYEG", name: "Veurey Eglise", lat: 45.27225, lon: 5.61564 },
+  { id: "VEUREYMA", name: "Veurey Mairie", lat: 45.27292, lon: 5.61302 },
+  { id: "BELGRADE", name: "Victor Hugo - Belgrade", lat: 45.19123, lon: 5.7252 },
+  { id: "VIEUXDON", name: "Vieux donjon", lat: 45.21138, lon: 5.64977 },
+  { id: "VIFGARE", name: "Vif Gare", lat: 45.04824, lon: 5.68573 },
+  { id: "VIFMAIRI", name: "Vif Mairie", lat: 45.05584, lon: 5.66897 },
+  { id: "PLAINE", name: "Vif, La Plaine", lat: 45.06686, lon: 5.69213 },
+  { id: "VIGNATE", name: "Vignate", lat: 45.18923, lon: 5.77806 },
+  { id: "VIGNY", name: "Vigny", lat: 45.16744, lon: 5.72338 },
+  { id: "VILLOLYM", name: "Village Olympique", lat: 45.16411, lon: 5.72404 },
+  { id: "VISANCOU", name: "Visancourt", lat: 45.23317, lon: 5.68606 },
+  { id: "LTE", name: "Vizille Lycée", lat: 45.06872, lon: 5.76836 },
+  { id: "VZVEN", name: "Vénaria", lat: 45.08181, lon: 5.77168 },
+  { id: "XAVJOUVI", name: "Xavier Jouvin", lat: 45.1956, lon: 5.73009 },
+  { id: "ZASPEYRE", name: "Z.A. des Speyres", lat: 45.0569, lon: 5.68184 },
+  { id: "CHAMPSD", name: "ZA La Plaine", lat: 45.06841, lon: 5.72308 },
+  { id: "ZILES", name: "ZI des Iles", lat: 45.13853, lon: 5.69449 },
+  { id: "ZELLAMEL", name: "Zella Mehlis", lat: 45.16707, lon: 5.75354 },
+  { id: "SALLEZOL", name: "Zola - Mairie", lat: 45.08261, lon: 5.73371 },
   ];
+
+  // Association officielle ligne -> arrets desservis (issue du GTFS SEM officiel).
+  // Permet de verifier qu'un arret choisi appartient bien a la ligne selectionnee.
+  const LINE_STOPS = {
+    "15": ["ARN","BIRHAKEI","BOISFRAN","BOURG","BRIOT","CHAMPROM","CHAMPRON","CHENEVIE","CLINBELD","COUBERTI","DOMENEMA","EDELWEIS","JAB","MORTES","NEYRBELL","ORATOIRE","PERIBROS","PERRIERE","PIEDGIER","PLREPUBL","PORTGRES","PRIEURE","RENECASS","RIVETS","SONNANT","VALMY","VERDUN","VERNES"],
+    "16": ["ADELAUNE","ALLOVES","AUGUFERR","BAYARD","BEAUVERT","BIRHAKEI","BONPASTE","CAPUCHE","CASANOVA","CASBONNE","CLOSDOR","COLMANHE","CXPATRE","DEPORTES","DRMARTIN","EDROSTAN","ETIEGRAP","EUGENESU","FOCHFERI","GDCHATEL","GLAIEULS","GLIERES","GRUGLIAS","GUSTRIVE","HOUILLEB","JEANNARC","LALUIRE","LESESSAR","MADELEIN","MARIECUR","MASSENET","MONMOUSS","PHEROULT","POTIE","RIV","VASSIEUX","VERDUN","VERLAINE"],
+    "17": ["BASTILLE","BUCLOS","CORENCMA","CXMONTFL","EYGALA","GDTRONCH","HOPOLICE","HTMEYLAN","JULESREY","LAFOY","LYC","MONTFLEU","MURIERS","MUTUALIT","NOTREDAM","OISEAUX","PTTRONCH","STLAUREN","STROCH","VERDUN","XAVJOUVI"],
+    "18": ["ARGOUGES","AUGURAVI","BELAIR","CEDRE","CENSOCIO","CENTHEOL","CHAUMETI","CHAVANT","CIMETIGS","CLEMENCE","COMMANAL","DRIANT","DRMARTIN","EDISON","GRESIVAU","HOPMICHA","JFLANDRI","LEMARAIS","LEONJOUH","LESBAINS","LYC","LYCBACHA","MUSHEBER","MUTUALIT","NEUR","PAULCOCA","PAULELUA","PIERRELO","PREMOL","ROBESPIE","RS","STJBOSCO","STROCH","TRONCHOP","VERDUN"],
+    "19": ["ANCIGARE","ARBERGES","ARGOUD","BELVEDER","BOUCHDV","CIG","CURIVERC","ECRINS","FOPHI","HENRIREY","JULESGUE","LAMURAIL","LAPOYA","LECOMB","LEGUA","LESPIES","MAISONNA","MARAT","OVALIE","PLACMARC","PLIBERAT","PLV","PREFLEUR","PRENOUVE","RUEALPES","RUEPASTE","SNETVILA","TREFFORI"],
+    "20": ["ANCIEMAI","BERGVERC","CHATSASS","CHAULNES","ECHALIER","ENGENIER","ILESCORD","JEANPREV","KARLMARX","LACUCHE","LAPOYA","LEGUA","LESILES","LESPIES","NOYARBAS","NOYARSTJ","OVALIE","PERIERES","PLIBERAT","PRAPARIS","PRAPAROS","PREFLEUR","ROLLANDI","RUISSET","SEYHDV","TREFFORI","VEUREYRI"],
+    "21": ["BOURNET","CHAUMIER","CHIEZE","CIG","CLAIXMAI","COLCOMBO","CRXROLLA","FURONNIE","HENRIREY","LABAUME","MARCSANG","POMPIDOU","POSTE","PRENOUVE","PRISME","PTROUGE","RONZY"],
+    "22": ["BELLEDON","BIOLLE","CAP38","CAPDESH","CUVILLEU","EGLISESE","EGR","GAGNIERE","GAVANIER","GLAIRAUX","KARBEN","LAMONTA","MOUTONNE","MURET","OXF","PREDIEU","PTVENCE","ROCHEPLE","ROCHERES","VISANCOU"],
+    "23": ["ALBERGES","BIBLIUNI","BIOLOGIE","CHAT","CORNIERS","CROISEM","EDELWEIS","GIERGARE","GUICHARD","JBRUANT","JRCHA","LACOMBE","LATUILE","LECHENIL","LEPLATRE","LESALLAS","LTE","MAISON","MARCHAND","MAUPA","PEAGEDEV","PEIFEND","PONTMAS","RSM","TERRATS","TRAVERS","UGA","VAULBAS","VAULHAUT","VIGNATE"],
+    "24": ["ANGUISSE","BIRHAKEI","CITELABE","COLI","CROIXROU","EDELWEIS","ELSATRIO","GALOCHER","GAY","JRCHA","MC","PORTAILR","ROSERAIE","VALMY","VERDUN"],
+    "25": ["ALLIES","ALSACELO","BAYARD","CAB","CARRIERE","CHALET","CIMEBOUR","CONDORCE","FOCHFERI","GARCINS","GARES","GRANGE","ILESMARS","LAVALONE","LERIF","LETOILE","LMICHEL","MASSEGU","ORIEL","PCM","PELISIER","PONTGENE","PREORME","PTROUGE","QUINZAIN","ROCHEFOR","RONDEAU","RONDEURO","SAILLANT","STADLESD","STEANGE","URIOL","USINENOR","VALLIBE","VARCESRE","VIFGEND","VIFMAIRI"],
+    "41": ["CARONBAS","CEDRE","CORENCMA","CORENCVI","CORNEDOR","DOYENGOS","GARENNE","GRDSABLO","LECHERES","MAIRIECO","MOLLARD","MONUMENT","PAJON","PASCAL","PLAINEFL","PROVIDEN","VERCORS"],
+    "42": ["13600","13601","13602","13603","13604","AIGUIHEX","ANCMAIRI","BERIVIER","BUC1","CHAMPLAR","CLV","CXCI","CXRAMEAU","DETOURBE","EAU","HTMEYLAN","JAILLIER","LYC","MEG","MEYLMAIR","MP","MURIERS","MUS","PLALOUIS","REV","RS","STMURY","STVICTOR","TER"],
+    "44": ["ARZELIER","BAYANNE","CASSOULE","COLARZEL","LACHARRI","LAPIERRE","LEGUAMAI","LESFAURE","LEVERNAY","MIRIBEL","PRELENFR","ROS","SAILLANT","STBARTHE"],
+    "45": ["ALEGRANG","BALZAZ","BERLIOGN","ECOLEREY","FONTAGNE","JACOBINS","LAVALONE","LEREFUGE","MALISSOL","MASGARNI","MASSEGU","NODAMLAC","ORIEL","PETIBRIO","PLAINE","RONDEURO","ROZATIER","SACRISTI","STEND","VAGCH","VIFGEND","ZASPEYRE"],
+    "46": ["BASCULE","CHAMBORD","CROIX","GARDE","MEINGET","ORIEL","PLATANES","POMMERAI","POULAT","RONDEURO","SPAULMAI"],
+    "47": ["BAUCHES","BELLEVUE","BOULODRO","CHANTERA","CHARRIER","CHIEZE","CLAIXMAI","PAMPRES","PAVILLON","POMPIDOU","PTROUGE","RISSET","RONZY","ROSES","SAINTMIC","TAILLIS","VALALLIE"],
+    "48": ["BEAU","CHAUMES","CHEABBE","CIMENTIE","CLBAL","COSSEY","COT","CRXROLLA","DRAC","FONDRATE","MALHIVER","MOUCHERO","PEROUSES","POMPIDOU","PTROUGE","VERT"],
+    "49": ["ANCIGARE","BEAUVOIR","CIMESEYP","CLINDAU","LAGNEAU","LALUNE","LECELLIE","LEPARL","LEPRIOU","LESCOTES","PERCEVAL","PFMITTER","PLV","PRISME","TUILERIE"],
+    "50": ["BEAUREVO","BLANCFON","CHATBEAU","CHATSASS","COTE","LAPOYA","LESPIES","PARCS","PLIBERAT","PREFLEUR","RIVOIRE","SACHE","SAMOL","TREFFORI","VIEUXDON"],
+    "51": ["BERYL","BONNAIS","CAP38","CHATEAUX","CHATELAR","CHAULNES","ECHALIER","EGR","ILESCORD","KARBEN","LACUCHE","MARRONNI","NOYARBAS","NOYARSTJ","PERIERES","PRAPAROS","PTCHATEL","RUISSET","VEUREYEG","VEUREYMA","VEUREYRI"],
+    "54": ["BONNAIS","CAP38","CHAMECHA","CHATSASS","COMPLEXE","EGISE","EGR","ENGENIER","FRBLUMET","KARBEN","LEGUA","MALADIER","MARESIST","OVALIE","OXF","PRAPARIS","PTVENCE","ROLLANDI","VENCEECO"],
+    "55": ["16AOUT44","BANCHARD","BUIS","CCL","CHEMI","CLOSGRUE","CLOSSTMA","CONRADKI","GUERIMAN","LARIVOIR","LEGATINE","LHERMITA","MAIRIESM","NARBONNE","RIPAILLE","SOU"],
+    "56": ["16AOUT44","ARO","BASMONT","BLE","CASAVILL","CCL","CIMEMONT","FONVIEIL","GUERIMAN","HOTELBEL","LACHAL","LAGOMMA","LEMASGAC","LESCOMBE","LESFAUVE","LEVETIER","MONTQUAI","REPOSOIR","ROUDIER","SMVINOUX","SOUSFRET"],
+    "59": ["CHENE","COMB","CORP","CRE","CROI","CULFROID","EDELWEIS","FAUX","FRENAIE","GNA","HAUT","JRCHA","LACHENAI","LAFAURIE","LASERRAL","LAVILLE","LECHAPON","LEPERROU","LEREYNET","LLN","LPE","LROSCO","PERE","PINET","PUIS","PV","ROCH","RONZ","SMUOIE","SMUVAL","SNU","SOUSPERO","VENONMAI"],
+    "60": ["BAR","BAZ","BELLEVU","CHARME","CHIAISE","COMBALEY","CUVILLEU","EGRECOLE","EGREGUA","EGREMOLL","FIANCEY","MORE","MURET","PLANF","PLANFAY","POMAR","POMAREY","PTVENCE","RIGAU","SAVOY","VISANCOU"],
+    "61": ["BAR","BARBET","BASPET","BASQUAIX","CUVILLEU","ECOLE","FIANCEY","GRANG","MURET","PLACEQUA","PTVENCE","ROUSTEGR","VISANCOU"],
+    "63": ["BONNAIS","COLAVIER","EGR","FOCHAIRE","FONTANIM","FONTCIM","KARBEN","LARIVO","NAMIERE","RAFOUR"],
+    "64": ["120TOISE","LETOILE","MARIANNE","ZILES"],
+    "65": ["ALI","ALPEXPO","BRIE","BRIECOLE","BRIEGLIS","BRSOU","CHANT","CHAT","FRQUESNA","GP","GRIMPI","ILIADE","JAVAUX","LEBOURG","LENCLOS","LESFORGE","LTE","PEAGEDEV","POLESUD","PREAUCR","REPLAT","TAV","VERDERET","VOHRIGEN"],
+    "66": ["ADELAUNE","ANMAL","CHABER","CHARBON","CHATEAU","CLOSJUV","COMBE","DENPAPIN","GAYLUSSA","GUYMOCQU","LANGEVIN","LEPLATR","MARIECUR","MAUPERTJ","PLACA","POLOTTI","RAMPE","SIMIA","THEVE","VERNET"],
+    "67": ["ALPEXPO","ANGONNES","BEAULIEU","CHOLLET","FRQUESNA","GP","HEBOURG","ILIADE","JAVAUX","LEBOURG","POLESUD","PREAUCR","TAV","VERDERET"],
+    "68": ["AVREPUB","BRESSON","CHATEAU","COMMANDE","EYBMAIRI","LAGAY","LECRET","MARITELL","POLOTTI","RAMPE","STADE","VERDERET","VIGNES"],
+    "70": ["ALI","CAMPVIZ","CDSTA","CHAMP","CHAMPSD","CHANT","CHAT","ECOLELP","EJCURIE","GARJA","GDVERGER","GONNADIE","GRIMPI","LAMELLE","LEOLA","LESFORGE","LTE","MAT","MONTCHAV","PONC","ROMANCHE","SALLEZOL","VOHRIGEN","VZVEN"],
+    "71": ["ANMAL","CHABER","CHARBON","GARJA","LEPLATR","MAUPERTJ","PLACA","SIMIA","THEVE","VERNET"],
+    "73": ["CANAL","CONDAM","GUILBERT","ISLE","LATOUR","MASSEGU","MOULIN","NDCV","PAUT","PEUPLE","PREBIL","SAINTPE","STGCOMMI","VIFGARE","VIFGEND","VIFMAIRI"],
+    "A": ["ADELAUNE","ALB","ALSACELO","ARLEQUIN","BER","BRUYERE","CHANDON","CHARLMIC","CHAVANT","DENPAPIN","DUBEDOUT","ECHIGARE","ESSARTS","FONTAHDV","FOVOG","GARES","GP","GR","LAPOYA","LETOILE","MAISONNA","MALHERBE","MARIECUR","MC2","MOUNIER","POLESUD","RAMPE","STBRUNO","SURIEUX","VERDUN","VICTHUGO"],
+    "B": ["ALB","ALSACELO","ARLEQUIN","BIBLIUNI","BRUYERE","CEACAMB","CHAVANT","CITEINTE","CONDIUNI","DUBEDOUT","GABFAURE","GARES","GIERGARE","GP","GRDSABLO","IL","MALHERBE","MAYENCIN","MC2","MICHALLO","MOUNIER","NOTREDAM","OXF","PALJUSTI","PLAINEDS","STBRUNO","STECLAIR","TA","TRONCHOP","VERDUN","VICTHUGO"],
+    "C": ["BIBLIUNI","CHAVANT","CONDIUNI","FAU","FOCHFERI","GABFAURE","GIERGARE","GRANDPRE","GREHOTEL","GUSTRIVE","HBERLUNI","MASDESIL","MAYENCIN","NEYRBELL","PERIBROS","PLAINEDS","PRISME","SEYHDV","TA","VACA","VALLCATA","VALLIBE","VALMY"],
+    "C1": ["AIGUIHEX","ARAGO","BEALIERE","BOD","BUC1","BUS","CARONRIE","CHAVANT","CITEMACE","DRMARTIN","DRMAZET","EAU","FELIXVIA","GARES","GREHOTEL","INR","MAC","MEYLMAIR","MO","MUS","PLAINEFL","PRM","REV","SABLONS","VICTHUGO"],
+    "C10": ["13300","13309","AGD","BERV","BIBLIUNI","BIOLOGIE","CHAMPROM","CHATEAU","CHRA","CLY","COG","CVAX","DETOURBE","ECOLHOSP","EVE","FRQUESNA","HOPITSUD","JAILLIER","LEMA","LPO","LYC","MARIECUR","MEMO","MG","MUS","PBER","POLOTTI","PORTGRES","PROMOSOC","RAMPE","RAT","RPR","SIG","STM","STMURY","TESS","VAX","VIGNATE"],
+    "C14": ["ALSACELO","CHALET","CIMEBOUR","GARCINS","GARES","GRANGE","LAVALONE","LERIF","MASSEGU","ORIEL","PELISIER","PONTGENE","ROCHEFOR","RONDEURO","SAILLANT","STEANGE","STGCOMMI","URIOL","USINENOR","VALLCATA","VALLIBE","VARCESRE","VIFGARE","VIFGEND","VIFMAIRI"],
+    "C2": ["BAYARD","CLOSDOMI","ECUREUIL","ILESMARS","IRENEJOL","LAMPHI","LETOILE","LMICHEL","MARCELLI","NAVIS","PCM","PTROUGE","QUINZAIN","RONDEAU","STADLESD"],
+    "C3": ["ALPEXPO","CAPUCHE","CHAMPION","CHATEAU","CHRISTUR","CLOSDOR","ECOLHOSP","EDMOESMO","EUGENESU","FOCHFERI","FRQUESNA","GP","GRAND","GRAPH","GUYMOCQU","HOPITSUD","LANGEVIN","MAISANCI","MARCEAU","POLESUD","VICTHUGO","VIGNY","VILLAGE","VILLOLYM"],
+    "C4": ["BAJATIER","CHAVANT","DEGAULLE","DRIANT","DRMARTIN","JAVAUX","JRACINE","LEBOURG","MAISNEUV","MALLIFAU","ODYSSEE","PCLAUDEL","PONSARD","TEISSEIR","VALEYBEN","VERDERET","VICTHUGO"],
+    "C5": ["ALLIES","ARGOUGES","BER","BIBLIUNI","BIOLOGIE","BONPASTE","CEMOI","CHAMPROM","CLINBELD","DRSCHWEI","EDVAILLA","ESCLANGO","FLAUCLOS","HDUNANT","LOUISJOU","LYSROUGE","MAINNATI","MALHERBE","NEYRBELL","PALJUSTI","PAULCOCA","PIERSEMA","PROMOSOC","RHINDANU","STALALLI","STAUGUST","TEISSEIR","VALLCATA"],
+    "C6": ["ARBERGES","BEAUSITE","CENTRESU","CENTRSOC","CHAMECHA","CHARMETT","CURIVERC","EDMOESMO","GP","LAPLAINE","LASURE","LESILES","MAISANCI","MAISNEUV","MAISONNA","MARESIST","OXF","PLGEANTS","PRISME","RAYCHANA","RONDEAU","RUEPASTE","SAUL","SEYHDV","SEYRON","SEYSROND","STADLESD","STEYNARD","TUILERIE","VERLAINE"],
+    "C7": ["BAYARD","CARINA","CENSOCIO","CHAMPFIL","CHATEAU","COLMANHE","COM","CXPATRE","DRAC2","ECOLHOSP","ETIEGRAP","FRQUESNA","GRUGLIAS","HENRIWAL","HOPITSUD","MUSGEOCH","NED","ODYSSEE","PELLOUTI","POLOTTI","POTIE","QUINZAIN","RAMPE","RUIRES","SMHVILLA"],
+    "C8": ["ABBEGREG","ALEMBERT","ANATFRAN","BACHELAR","BELGRADE","BIBLIUNI","BIOLOGIE","CHAMPION","CHAMPROM","CHAMPSEL","CHATELIE","CHOPIN","CHORCOND","CITEPMIS","CLINMUT","COLI","COLLSAUL","CONDORCE","DEGAULLE","DRMARTIN","DRSCHWEI","EDMOESMO","EPICEA","ETIEGRAP","GP","HDUNANT","HENRIWAL","IUTUFRAP","LEMARAIS","MAISANCI","NED","PROMOSOC","RAYCHANA","ROCHEPLA","SALENGRO","STADLESD","STBRUNNC","VACA","VERLAINE","VH","VICTHUGO","ZELLAMEL"],
+    "D": ["ALSACELO","BIBLIUNI","BLANCHON","CONDIUNI","DUBEDOUT","EDVAILLA","ETIEGRAP","GABFAURE","GARES","GIERGARE","GRDSABLO","IL","MAYENCIN","MC","MICHALLO","NEYRBELL","NOTREDAM","PLAINEDS","STECLAIR","TA","TRONCHOP","VICTHUGO"],
+    "E": ["ALLIES","ALSACELO","BIBLIUNI","CASAVILL","CHAVANT","CONDIUNI","CONDORCE","ESPLANAD","FOCHFERI","FTL","GABFAURE","GIERGARE","GREHOTEL","GUSTRIVE","HORLOGE","KARBEN","LMICHEL","MAIRIESM","MAYENCIN","MURET","NERON","NEYRBELL","PERIBROS","PINEA","PLAINEDS","PREDIEU","PTVENCE","RAFOUR","TA","VALLIBE","VALMY"],
+    "N62": ["BASTILLE","CHEMBATO","CHURU","COLPORTE","COLVENCE","CORENCVI","CORNEDOR","GARENNE","HVENCE","LAPRAIRI","LEGORGET","LEGOUILL","MOLLARD","MOLLARSA","MONUMENT","NOTREDAM","PALAQUIT","PLACESAP","PROVIDEN","PTTRONCH","SAINTEYN","SARCENA","SARCROZ","STGERMAI","STLAUREN","XAVJOUVI"],
+    "NAVA": ["ALB","BER","CHARLMIC","CHAVANT","CITEINTE","DRMARTIN","DRMAZET","FELIXVIA","FONTAHDV","FOVOG","GARES","GP","GRBRU","LAPOYA","LEMAIL","MAISONNA","MALHERBE","MC2","MOUNIER","PALJUSTI","REYNOARD","VERDUN","VH","VICTHUGO"],
+    "NAVB": ["BIOLOGIE","CEACAMB","CITEINTE","CONDIUNI","GABFAURE","GIERGARE","GRDSABLO","HOPMICHA","HOPOLICE","IL","MUTUALIT","NEUR","NEYRBELL","OXF","PALJUSTI","PERIBROS","PLAINEDS","PROMOSOC","STROCH","TAILLEES","TRONCHOP","VERDUN","VIGNATE"],
+  };
 
   function badgeContent(line){
     return '<span style="font-size:13px;line-height:1;">👮</span><span style="display:block;line-height:1.05;margin-top:1px;">' + escapeHtml(line) + '</span>';
@@ -578,6 +1190,7 @@
   let selectedMode = 'Bus';
   let selectedLine = null;
   let pickedPoint = null; // {x:0-1, y:0-1} fraction
+  let pickedStopId = null; // GTFS station id when the point comes from an official arrêt suggestion, else null
   let profile = { id: null, nickname: '' };
   let votedThisSession = new Set(); // UX-only optimistic cache; the server enforces the real uniqueness rule
   let activeCardId = null;
@@ -601,12 +1214,16 @@
   function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
   function ageMinutes(r){ return (Date.now() - r.timestamp) / 60000; }
   function freshClass(age){ if(age < FRESH_MIN) return 'fresh'; if(age < AGING_MIN) return 'aging'; return 'stale'; }
-  function fmtAge(age){ if(age < 1) return "à l'instant"; return 'il y a ' + Math.floor(age) + ' min'; }
+  function fmtAge(age){
+    if(age < 1) return I18N[currentLang].justNow;
+    return I18N[currentLang].agoPrefix + Math.floor(age) + I18N[currentLang].minSuffix;
+  }
   function fmtDateTime(ts){
     const d = new Date(ts);
-    const dateStr = d.toLocaleDateString('fr-FR', {day:'2-digit', month:'2-digit'});
-    const timeStr = d.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
-    return dateStr + ' à ' + timeStr;
+    const loc = currentLang === 'ar' ? 'ar' : 'fr-FR';
+    const dateStr = d.toLocaleDateString(loc, {day:'2-digit', month:'2-digit'});
+    const timeStr = d.toLocaleTimeString(loc, {hour:'2-digit', minute:'2-digit'});
+    return dateStr + ' ' + (currentLang==='ar' ? '' : 'à ') + timeStr;
   }
   function isVisible(r){
     const age = ageMinutes(r);
@@ -615,7 +1232,93 @@
     return true;
   }
 
+  // ---------------- distance & "ma position" ----------------
+  let myLocation = null; // {lat, lng} — défini uniquement si l'utilisateur accepte la géolocalisation
+  function haversine(lat1, lon1, lat2, lon2){
+    const R = 6371000, toRad = d => d * Math.PI / 180;
+    const dLat = toRad(lat2 - lat1), dLon = toRad(lon2 - lon1);
+    const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2)**2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
+  function distanceTo(r){
+    if(!myLocation || typeof r.lat !== 'number' || typeof r.lng !== 'number') return null;
+    return haversine(myLocation.lat, myLocation.lng, r.lat, r.lng);
+  }
+  function fmtDist(m){
+    if(m == null) return '';
+    if(m < 1000) return Math.round(m) + ' m';
+    return (m/1000).toFixed(1) + ' km';
+  }
+
+  // ---------------- filtre Liste (mode + ligne) ----------------
+  let filterMode = 'all';
+  let filterLine = 'all';
+
+  // ---------------- alertes de proximité (Notification API, app ouverte) ----------------
+  let notifyEnabled = localStorage.getItem('notifyEnabled') === '1';
+  let knownReportIds = null; // null = premier chargement, on ne notifie pas rétroactivement
+  const NOTIFY_RADIUS_M = 800;
+
+  // ---------------- partage ----------------
+  async function shareReport(r){
+    const text = '🚨 ' + r.mode + ' ' + r.line + ' — ' + r.location + ' (' + fmtAge(ageMinutes(r)) + ')';
+    if(navigator.share){
+      try{ await navigator.share({ title: 'Alerte contrôleur', text }); } catch(e){ /* annulé par l'utilisateur */ }
+    } else {
+      try{ await navigator.clipboard.writeText(text); showToast(I18N[currentLang].copied); }
+      catch(e){ showToast(I18N[currentLang].shareUnavailable); }
+    }
+  }
+
+  // ---------------- i18n (FR / AR) ----------------
+  let currentLang = localStorage.getItem('appLang') || 'fr';
+  const I18N = {
+    fr: {
+      tabMap:'Carte', tabList:'Liste', tabMine:'Mes signalements',
+      statActive:'actif(s)', statFresh:'récents <10 min',
+      fAll:'Tous', fBus:'Bus', fTram:'Tram', fAllLines:'Toutes lignes',
+      btnStillThere:'Toujours là', btnLeft:'Parti',
+      emptyList:'Aucun contrôle signalé pour le moment.<br>Soyez le premier à prévenir le réseau.',
+      emptyMine:'Vous n\u2019avez pas encore de signalement.',
+      justNow:"à l'instant", agoPrefix:'il y a ', minSuffix:' min',
+      copied:'Copié dans le presse-papiers', shareUnavailable:'Partage indisponible',
+      notifyOn:'Alertes de proximité activées ✓', notifyOff:'Alertes de proximité désactivées',
+      notifyDenied:'Notifications refusées — activez-les dans les réglages du navigateur',
+      newNearby:'🚨 Nouveau contrôle signalé près de vous'
+    },
+    ar: {
+      tabMap:'الخريطة', tabList:'القائمة', tabMine:'بلاغاتي',
+      statActive:'نشط', statFresh:'حديث <10 د',
+      fAll:'الكل', fBus:'حافلة', fTram:'ترام', fAllLines:'كل الخطوط',
+      btnStillThere:'لا يزال هنا', btnLeft:'غادر',
+      emptyList:'لا يوجد بلاغ مراقبة حالياً.<br>كن أول من ينبّه الشبكة.',
+      emptyMine:'ليس لديك أي بلاغ بعد.',
+      justNow:'الآن', agoPrefix:'منذ ', minSuffix:' د',
+      copied:'تم النسخ', shareUnavailable:'المشاركة غير متاحة',
+      notifyOn:'تم تفعيل تنبيهات القرب ✓', notifyOff:'تم إيقاف تنبيهات القرب',
+      notifyDenied:'تم رفض الإشعارات — فعّلها من إعدادات المتصفح',
+      newNearby:'🚨 بلاغ مراقبة جديد بالقرب منك'
+    }
+  };
+  function applyI18n(){
+    document.documentElement.lang = currentLang;
+    document.documentElement.dir = currentLang === 'ar' ? 'rtl' : 'ltr';
+    el('langBtn').textContent = currentLang === 'ar' ? 'AR' : 'FR';
+    document.querySelectorAll('[data-i18n]').forEach(node=>{
+      const key = node.getAttribute('data-i18n');
+      if(I18N[currentLang][key] != null) node.innerHTML = I18N[currentLang][key];
+    });
+    renderAll();
+  }
+  el('langBtn').addEventListener('click', ()=>{
+    currentLang = currentLang === 'fr' ? 'ar' : 'fr';
+    localStorage.setItem('appLang', currentLang);
+    applyI18n();
+  });
+
   const GRENOBLE_CENTER = [45.1885, 5.7245];
+
+
 
   const mainMap = L.map('mainMapEl', { zoomControl:true, attributionControl:true, tap:true })
     .setView(GRENOBLE_CENTER, 13);
@@ -623,6 +1326,33 @@
     maxZoom:19, attribution:'© OpenStreetMap'
   }).addTo(mainMap);
   let markersLayer = L.layerGroup().addTo(mainMap);
+
+  // ---------------- "Ma position" (opt-in, la demande de permission vient du navigateur) ----------------
+  let meMarker = null;
+  const meDivIcon = L.divIcon({ className: '', html: '<div class="meDot"></div>', iconSize: [16,16], iconAnchor: [8,8] });
+  el('locateBtn').addEventListener('click', ()=>{
+    if(!('geolocation' in navigator)){ showToast("Géolocalisation non supportée par cet appareil"); return; }
+    const btn = el('locateBtn');
+    btn.classList.add('busy');
+    navigator.geolocation.getCurrentPosition(
+      (pos)=>{
+        btn.classList.remove('busy'); btn.classList.add('active');
+        const { latitude, longitude } = pos.coords;
+        myLocation = { lat: latitude, lng: longitude };
+        if(meMarker) mainMap.removeLayer(meMarker);
+        meMarker = L.marker([latitude, longitude], { icon: meDivIcon, zIndexOffset: 1000 }).addTo(mainMap);
+        mainMap.setView([latitude, longitude], 15);
+        showToast('Position trouvée — contrôles autour de vous ✓');
+        renderAll();
+      },
+      (err)=>{
+        btn.classList.remove('busy');
+        if(err.code === err.PERMISSION_DENIED) showToast('Localisation refusée — activez-la dans les réglages du navigateur');
+        else showToast('Impossible de vous localiser, réessayez');
+      },
+      { enableHighAccuracy:true, timeout:10000, maximumAge:60000 }
+    );
+  });
 
   const pickMap = L.map('pickMapEl', { zoomControl:false, attributionControl:false, tap:true })
     .setView(GRENOBLE_CENTER, 13);
@@ -732,6 +1462,7 @@
   }
   pickMap.on('click', (e)=>{
     pickedPoint = { lat: e.latlng.lat, lng: e.latlng.lng };
+    pickedStopId = null;
     placePickPin(pickedPoint, false);
     validateForm();
   });
@@ -743,12 +1474,13 @@
   }
   function closeSheet(){
     el('overlay').classList.remove('show'); el('sheet').classList.remove('show');
-    selectedLine = null; pickedPoint = null;
+    selectedLine = null; pickedPoint = null; pickedStopId = null;
     el('locInput').value=''; el('noteInput').value='';
     document.querySelectorAll('.chip.selected').forEach(c=>c.classList.remove('selected'));
     el('pickHint').textContent = 'Aucun point placé — touchez la carte';
     el('locSuggest').classList.remove('show'); el('locSuggest').innerHTML='';
     el('customLineField').style.display = 'none'; el('customLineInput').value = '';
+    el('lineErr').classList.remove('show'); el('lineErr').textContent = '';
     if(pickMarker){ pickMap.removeLayer(pickMarker); pickMarker=null; }
     pickMap.setView(GRENOBLE_CENTER, 13);
     validateForm();
@@ -768,6 +1500,8 @@
       document.querySelectorAll('.chip.selected').forEach(c=>c.classList.remove('selected'));
       el('customLineField').style.display = 'none';
       el('customLineInput').value = '';
+      checkLineStopMatch();
+      updateSuggestions();
       validateForm();
     });
   });
@@ -787,35 +1521,63 @@
         el('customLineField').style.display = 'none';
         el('customLineInput').value = '';
       }
+      checkLineStopMatch();
+      updateSuggestions();
       validateForm();
     });
   });
   el('customLineInput').addEventListener('input', ()=>{
     selectedLine = el('customLineInput').value.trim();
+    checkLineStopMatch();
     validateForm();
   });
+
+  // ERR-LIGNE-ARRET : l'arrêt sélectionné (via suggestion officielle) n'appartient pas
+  // à la ligne choisie, d'après les données GTFS officielles du réseau M Réso.
+  function checkLineStopMatch(){
+    const box = el('lineErr');
+    if(!pickedStopId || !selectedLine || !LINE_STOPS[selectedLine]){
+      box.classList.remove('show'); box.textContent = '';
+      return true;
+    }
+    const ok = LINE_STOPS[selectedLine].includes(pickedStopId);
+    if(!ok){
+      box.textContent = '⚠ Erreur [ERR-LIGNE-ARRET] — cet arrêt n\u2019est pas desservi par la ligne ' + selectedMode + ' ' + selectedLine + '. Choisissez un arrêt de cette ligne ou repositionnez le point sur la carte.';
+      box.classList.add('show');
+      return false;
+    }
+    box.classList.remove('show'); box.textContent = '';
+    return true;
+  }
+
   function validateForm(){
-    el('submitBtn').disabled = !(selectedLine && selectedLine.length && el('locInput').value.trim().length && pickedPoint);
+    const base = selectedLine && selectedLine.length && el('locInput').value.trim().length && pickedPoint;
+    el('submitBtn').disabled = !(base && checkLineStopMatch());
   }
   function updateSuggestions(){
     const q = el('locInput').value.trim().toLowerCase();
     const box = el('locSuggest');
     if(q.length < 2){ box.classList.remove('show'); box.innerHTML=''; return; }
-    const matches = STOP_NAMES.filter(s=>s.name.toLowerCase().includes(q)).slice(0,6);
+    // Si une ligne officielle connue est choisie, ne proposer que ses arrêts réels (GTFS).
+    const pool = (selectedLine && LINE_STOPS[selectedLine])
+      ? STOP_NAMES.filter(s => LINE_STOPS[selectedLine].includes(s.id))
+      : STOP_NAMES;
+    const matches = pool.filter(s=>s.name.toLowerCase().includes(q)).slice(0,8);
     if(!matches.length){ box.classList.remove('show'); box.innerHTML=''; return; }
     box.innerHTML = matches.map(s=>{
       const idx = s.name.toLowerCase().indexOf(q);
       const before = s.name.slice(0,idx), mid = s.name.slice(idx,idx+q.length), after = s.name.slice(idx+q.length);
-      return '<div class="suggestItem" data-name="'+escapeHtml(s.name)+'" data-lat="'+s.lat+'" data-lon="'+s.lon+'">'+escapeHtml(before)+'<b>'+escapeHtml(mid)+'</b>'+escapeHtml(after)+'</div>';
+      return '<div class="suggestItem" data-id="'+escapeHtml(s.id)+'" data-name="'+escapeHtml(s.name)+'" data-lat="'+s.lat+'" data-lon="'+s.lon+'">'+escapeHtml(before)+'<b>'+escapeHtml(mid)+'</b>'+escapeHtml(after)+'</div>';
     }).join('');
     box.classList.add('show');
   }
-  el('locInput').addEventListener('input', ()=>{ validateForm(); updateSuggestions(); });
+  el('locInput').addEventListener('input', ()=>{ pickedStopId = null; checkLineStopMatch(); validateForm(); updateSuggestions(); });
   el('locSuggest').addEventListener('click', (e)=>{
     const item = e.target.closest('.suggestItem');
     if(!item) return;
     el('locInput').value = item.dataset.name;
     el('locSuggest').classList.remove('show'); el('locSuggest').innerHTML='';
+    pickedStopId = item.dataset.id;
     // place the pin exactly at the selected stop's real GPS position
     pickedPoint = { lat: parseFloat(item.dataset.lat), lng: parseFloat(item.dataset.lon) };
     placePickPin(pickedPoint, true);
@@ -858,6 +1620,26 @@
       .from('reports_public').select('*').order('created_at', { ascending:false });
     if(error){ console.error('loadReports failed, keeping existing data', error); return; }
     reports = (data || []).map(mapDbRow);
+    checkNewReportsForNotify(reports);
+  }
+  function checkNewReportsForNotify(list){
+    const currentIds = new Set(list.map(r=>r.id));
+    if(knownReportIds === null){ knownReportIds = currentIds; return; } // premier chargement : rien à notifier
+    if(notifyEnabled && 'Notification' in window && Notification.permission === 'granted'){
+      list.forEach(r=>{
+        if(knownReportIds.has(r.id)) return; // déjà connu
+        if(!isVisible(r)) return;
+        const d = distanceTo(r);
+        if(myLocation && (d === null || d > NOTIFY_RADIUS_M)) return; // trop loin
+        try{
+          new Notification(I18N[currentLang].newNearby, {
+            body: r.mode + ' ' + r.line + ' — ' + r.location + (d!=null ? ' (' + fmtDist(d) + ')' : ''),
+            tag: 'report-' + r.id, icon: 'icon-192.png'
+          });
+        }catch(e){}
+      });
+    }
+    knownReportIds = currentIds;
   }
   async function loadMyReports(){
     const { data, error } = await supabase
@@ -887,15 +1669,29 @@
 
   // ---------------- render ----------------
   function renderAll(){
-    const visible = reports.filter(isVisible).sort((a,b)=>b.timestamp - a.timestamp);
-    el('statActive').textContent = visible.length;
-    el('statFresh').textContent = visible.filter(r=>ageMinutes(r) < FRESH_MIN).length;
+    const visible = reports.filter(isVisible);
+    const visibleSorted = visible.slice().sort((a,b)=>b.timestamp - a.timestamp);
+    el('statActive').textContent = visibleSorted.length;
+    el('statFresh').textContent = visibleSorted.filter(r=>ageMinutes(r) < FRESH_MIN).length;
 
-    renderMainMarkers(visible);
-    renderList(visible, el('boardList'), false);
+    renderMainMarkers(visibleSorted);
+
+    // Liste : filtre mode/ligne, puis tri par distance si "ma position" est connue, sinon par récence
+    let filtered = visible.filter(r =>
+      (filterMode === 'all' || r.mode === filterMode) &&
+      (filterLine === 'all' || r.line === filterLine)
+    );
+    filtered = filtered.slice().sort((a,b)=>{
+      if(myLocation){
+        const da = distanceTo(a), db = distanceTo(b);
+        if(da != null && db != null && da !== db) return da - db;
+      }
+      return b.timestamp - a.timestamp;
+    });
+    renderList(filtered, el('boardList'), false);
     renderList(myReports.slice().sort((a,b)=>b.timestamp-a.timestamp), el('boardMine'), true);
 
-    if(activeCardId && !visible.find(r=>r.id===activeCardId)) closeInfoCard();
+    if(activeCardId && !visibleSorted.find(r=>r.id===activeCardId)) closeInfoCard();
   }
 
   function renderList(list, container, mineMode){
@@ -903,9 +1699,7 @@
     if(!list.length){
       const empty = document.createElement('div');
       empty.className = 'empty';
-      empty.innerHTML = mineMode
-        ? '<span class="glyph">◌</span>Vous n\u2019avez pas encore de signalement.'
-        : '<span class="glyph">◌</span>Aucun contrôle signalé pour le moment.<br>Soyez le premier à prévenir le réseau.';
+      empty.innerHTML = '<span class="glyph">◌</span>' + (mineMode ? I18N[currentLang].emptyMine : I18N[currentLang].emptyList);
       container.appendChild(empty);
       return;
     }
@@ -916,6 +1710,7 @@
       const gone = !isVisible(r);
       const canVoteConfirm = !votedThisSession.has(r.id+':confirm');
       const canVoteLeft = !votedThisSession.has(r.id+':left');
+      const dist = mineMode ? null : distanceTo(r);
       const row = document.createElement('div');
       row.className = 'row';
       row.style.opacity = gone ? 0.45 : 1;
@@ -923,14 +1718,15 @@
         <div class="badge ${cls}">${badgeContent(r.line)}</div>
         <div class="info">
           <div class="loc">${escapeHtml(r.location)}</div>
-          <div class="meta"><span>${r.mode}</span><span>${fmtAge(age)}</span><span>${fmtDateTime(r.timestamp)}</span>${r.stillHereCount ? `<span>✓ ${r.stillHereCount}</span>` : ''}${gone?'<span>(marqué parti)</span>':''}</div>
+          <div class="meta"><span>${r.mode}</span>${dist!=null?`<span>📍${fmtDist(dist)}</span>`:''}<span>${fmtAge(age)}</span><span>${fmtDateTime(r.timestamp)}</span>${r.stillHereCount ? `<span>✓ ${r.stillHereCount}</span>` : ''}${gone?'<span>(marqué parti)</span>':''}</div>
           ${r.note ? `<div class="note">${escapeHtml(r.note)}</div>` : ''}
         </div>
         <div class="actions">
           ${mineMode
             ? `<span style="font-size:10px; color:var(--text-grey);">${r.stillHereCount||0} confirmation(s)</span>`
-            : `<button class="actbtn" data-id="${r.id}" data-act="confirm" ${canVoteConfirm?'':'disabled'} style="${canVoteConfirm?'':'opacity:.35'}">Toujours là</button>
-               <button class="actbtn left" data-id="${r.id}" data-act="left" ${canVoteLeft?'':'disabled'} style="${canVoteLeft?'':'opacity:.35'}">Parti</button>`}
+            : `<button class="actbtn" data-id="${r.id}" data-act="confirm" ${canVoteConfirm?'':'disabled'} style="${canVoteConfirm?'':'opacity:.35'}">${I18N[currentLang].btnStillThere}</button>
+               <button class="actbtn left" data-id="${r.id}" data-act="left" ${canVoteLeft?'':'disabled'} style="${canVoteLeft?'':'opacity:.35'}">${I18N[currentLang].btnLeft}</button>`}
+          <button class="rowShareBtn shareBtn" data-id="${r.id}" title="Partager">↗</button>
         </div>
         <div class="freshbar"><div style="width:${pct}%"></div></div>
       `;
@@ -938,14 +1734,83 @@
     });
   }
 
+  // ---------------- notifications de proximité (bouton cloche) ----------------
+  function updateNotifyBtnUI(){
+    el('notifyBtn').classList.toggle('on', notifyEnabled && 'Notification' in window && Notification.permission === 'granted');
+  }
+  el('notifyBtn').addEventListener('click', async ()=>{
+    if(!('Notification' in window)){ showToast('Notifications non supportées'); return; }
+    if(notifyEnabled){
+      notifyEnabled = false;
+      localStorage.setItem('notifyEnabled', '0');
+      showToast(I18N[currentLang].notifyOff);
+      updateNotifyBtnUI();
+      return;
+    }
+    let perm = Notification.permission;
+    if(perm === 'default') perm = await Notification.requestPermission();
+    if(perm === 'granted'){
+      notifyEnabled = true;
+      localStorage.setItem('notifyEnabled', '1');
+      showToast(I18N[currentLang].notifyOn);
+    } else {
+      notifyEnabled = false;
+      localStorage.setItem('notifyEnabled', '0');
+      showToast(I18N[currentLang].notifyDenied);
+    }
+    updateNotifyBtnUI();
+  });
+  updateNotifyBtnUI();
+
+  // ---------------- PWA : service worker (coquille app en cache) ----------------
+  if('serviceWorker' in navigator){
+    window.addEventListener('load', ()=>{ navigator.serviceWorker.register('sw.js').catch(()=>{}); });
+  }
+
   document.addEventListener('click', (e)=>{
     const btn = e.target.closest('.actbtn[data-id]');
     if(btn && !btn.disabled){ castVote(btn.dataset.id, btn.dataset.act); return; }
+    const shareBtn = e.target.closest('.rowShareBtn[data-id]');
+    if(shareBtn){
+      const r = reports.find(x=>x.id===shareBtn.dataset.id) || myReports.find(x=>x.id===shareBtn.dataset.id);
+      if(r) shareReport(r);
+    }
+  });
+  el('icShare').addEventListener('click', ()=>{
+    const r = reports.find(x=>x.id===activeCardId);
+    if(r) shareReport(r);
   });
 
+  // ---------------- filtre Liste ----------------
+  el('filterBar').addEventListener('click', (e)=>{
+    const chip = e.target.closest('.fchip');
+    if(!chip) return;
+    document.querySelectorAll('#filterBar .fchip').forEach(c=>c.classList.remove('active'));
+    chip.classList.add('active');
+    filterMode = chip.dataset.mode;
+    filterLine = 'all';
+    rebuildLineSelect();
+    renderAll();
+  });
+  el('lineSelect').addEventListener('change', ()=>{
+    filterLine = el('lineSelect').value;
+    renderAll();
+  });
+  function rebuildLineSelect(){
+    const sel = el('lineSelect');
+    const pool = reports.filter(r => filterMode==='all' || r.mode===filterMode);
+    const lines = Array.from(new Set(pool.map(r=>r.line))).sort();
+    const current = filterLine;
+    sel.innerHTML = '<option value="all">' + I18N[currentLang].fAllLines + '</option>' +
+      lines.map(l=>'<option value="'+escapeHtml(l)+'">'+escapeHtml(l)+'</option>').join('');
+    sel.value = lines.includes(current) ? current : 'all';
+    filterLine = sel.value;
+  }
+
   // ---------------- init + polling ----------------
-  async function refresh(){ await loadReports(); await loadMyReports(); renderAll(); }
+  async function refresh(){ await loadReports(); await loadMyReports(); rebuildLineSelect(); renderAll(); }
   (async ()=>{
+    applyI18n();
     await initProfile();
     await refresh();
     setInterval(refresh, 8000);
@@ -955,3 +1820,7 @@
 </script>
 </body>
 </html>
+
+
+
+     
